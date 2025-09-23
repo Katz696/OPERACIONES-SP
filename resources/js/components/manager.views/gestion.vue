@@ -89,15 +89,14 @@ function onEdit() {
     });
 }
 function applyProcessToProject() {
-    recalculateEdt(treeData.value);
     propagateDatesTopDown(treeData.value);
     globalSort();
-    calculateDurationsBottomUp(treeData.value);
+    recalculateEdt(treeData.value);
     updateStatusAndProgress(treeData.value);
     calculatePercentPlannedBottomUp(treeData.value);
     calculatePercentCompletedBottomUp(treeData.value);
     forceRefreshTree();
-}
+} 
 // 🔁 Reemplaza por una nueva copia para reactividad
 function forceRefreshTree() {
     treeData.value = JSON.parse(JSON.stringify(treeData.value));
@@ -128,6 +127,7 @@ function updateStatusAndProgress(nodes: any[]): void {
                 node.data.status_id = 2;
             }
         } else {
+            const actPercent = node.data.percentage;
             // Nodo hoja (actividad)
             if (node.data.percentage === 100) {
                 node.data.status_id = 4;
@@ -208,32 +208,6 @@ function calculatePercentPlannedBottomUp(nodes: any[], today: Date = new Date())
         }
     });
 }
-//calcular duracion
-function calculateDurationsBottomUp(nodes: any[]): number {
-    return nodes.reduce((maxDays, node) => {
-        if (node.children?.length) {
-            // Calcular duraciones de hijos y encontrar el rango de fechas
-            let minStart: Date | null = null;
-            let maxEnd: Date | null = null;
-
-            node.children.forEach((child: any) => {
-                calculateDurationsBottomUp([child]); // Recursivo
-                const childStart = child.data.start_date ? new Date(child.data.start_date) : null;
-                const childEnd = child.data.end_date ? new Date(child.data.end_date) : null;
-
-                if (childStart && (!minStart || childStart < minStart)) minStart = childStart;
-                if (childEnd && (!maxEnd || childEnd > maxEnd)) maxEnd = childEnd;
-            });
-
-            // Si todos los hijos tienen fechas, usamos su diferencia como duración del padre
-            if (minStart && maxEnd) {
-                node.data.days = getWorkingDaysBetween(node.data.start_date, maxEnd);
-                const end = calculateRangeLaboralDays(node.data.days, node.data.start_date);
-                node.data.end_date = end.toISOString().split('T')[0];
-            }
-        }
-    }, 0);
-}
 function getWorkingDaysBetween(start: Date, end: Date): number {
     let count = 0;
     const current = new Date(start);
@@ -252,7 +226,7 @@ function parseLocalDate(dateStr: string): Date {
     return new Date(year, month - 1, day); // mes empieza desde 0
 }
 function calculateRangeLaboralDays(days: number, start: string): Date {
-    const startDate = parseLocalDate(start);
+    let startDate = parseLocalDate(start);
     const endDate = new Date(startDate);
     let count = 0;
 
@@ -277,43 +251,116 @@ function fixInitLaboralDay(day: string, add: number) {
     }
     return date.toISOString().split('T')[0];
 }
-
+function calculateDurationDays(start: string, end: string): number {
+    const startDate = parseLocalDate(start);
+    const endDate = parseLocalDate(end);
+    let days = 0;
+    while (startDate <= endDate) {
+        if (startDate.getDay() !== 0 && startDate.getDay() !== 6) {
+            days++;
+        }
+        startDate.setDate(startDate.getDate() + 1);
+    }
+    return days;
+}
 function propagateDatesTopDown(nodes: any[], parentStartDate: string | null = null) {
     nodes.forEach((node) => {
         const data = node.data;
-        let parentNode = null;
-        if (data.i_depend !== null && (Array.isArray(data.i_depend) && data.i_depend.length > 0)) {
-            const iDepOfThese = nodes.filter((n) => data.i_depend.includes(n.data.id));
 
-            parentNode = iDepOfThese.reduce((nx, na) => {
-                const maxFutureDate = new Date(nx.data.end_date);
-                const actualFutureDate = new Date(na.data.end_date);
-                return actualFutureDate > maxFutureDate ? na : nx;
-            });
+        // Si tiene un padre, forzamos que tome el start_date en base al padre
+        if (parentStartDate) {
+            // Si depende de alguien explícitamente (i_depend), tomamos ese como prioridad
+            let suggestInitDate = parentStartDate;
+
+            if (data.i_depend && Array.isArray(data.i_depend) && data.i_depend.length > 0) {
+                const iDepOfThese = nodes.filter((n) => data.i_depend.includes(n.data.id));
+                if (iDepOfThese.length > 0) {
+                    const parentNode = iDepOfThese.reduce((nx, na) => {
+                        const maxFutureDate = new Date(nx.data.end_date);
+                        const actualFutureDate = new Date(na.data.end_date);
+                        return actualFutureDate > maxFutureDate ? na : nx;
+                    });
+                    suggestInitDate = fixInitLaboralDay(parentNode.data.end_date, 1);
+                }
+            }
+
+            data.start_date = fixInitLaboralDay(suggestInitDate, 0);
+            if (data.start_date && !isNaN(data.days)) {
+                const end = calculateRangeLaboralDays(data.days, data.start_date);
+                data.end_date = end.toISOString().split("T")[0];
+            }
         }
 
-        let suggestInitDate = parentStartDate;
-
-        if (data.start_date && !parentStartDate) {
-            suggestInitDate = fixInitLaboralDay(data.start_date, 0);
-        }
-
-        if (parentNode && parentNode.data.end_date) {
-            suggestInitDate = fixInitLaboralDay(parentNode.data.end_date, 1);
-        }
-
-        data.start_date = suggestInitDate;
-
-        if (data.start_date && !isNaN(data.days)) {
-            const end = calculateRangeLaboralDays(data.days, data.start_date);
-            data.end_date = end.toISOString().split('T')[0];
-        }
-
+        // Si tiene hijos, propagamos hacia abajo
         if (node.children?.length) {
             propagateDatesTopDown(node.children, data.start_date);
+
+            // Después de propagar, ajustamos fechas del padre
+            const mindate = node.children.reduce((nx: any, na: any) => {
+                const min = new Date(nx.data.start_date);
+                const actual = new Date(na.data.start_date);
+                return min > actual ? na : nx;
+            });
+            const maxdate = node.children.reduce((nx: any, na: any) => {
+                const max = new Date(nx.data.end_date);
+                const actual = new Date(na.data.end_date);
+                return max < actual ? na : nx;
+            });
+
+            data.days = calculateDurationDays(mindate.data.start_date, maxdate.data.end_date);
+            data.end_date = maxdate.data.end_date;
         }
     });
 }
+
+// function propagateDatesTopDown(nodes: any[], parentStartDate: string | null = null) {
+//     nodes.forEach((node) => {
+//         const data = node.data;
+//         if (node.children?.length) {
+//             propagateDatesTopDown(node.children, data.start_date);
+//             const mindate = node.children.reduce((nx: any, na: any) => {
+//                 const min = new Date(nx.data.start_date);
+//                 const actual = new Date(na.data.start_date);
+//                 return min > actual ? na : nx;
+//             });
+//             const maxdate = node.children.reduce((nx: any, na: any) => {
+//                 const max = new Date(nx.data.end_date);
+//                 const actual = new Date(na.data.end_date);
+//                 return max < actual ? na : nx;
+//             });
+//             data.days = calculateDurationDays(mindate.data.start_date,maxdate.data.end_date);
+//             data.end_date = maxdate.data.end_date;
+//         } else {
+//             let parentNode = null;
+//             if (data.i_depend !== null && Array.isArray(data.i_depend) && data.i_depend.length > 0) {
+//                 const iDepOfThese = nodes.filter((n) => data.i_depend.includes(n.data.id));
+
+//                 parentNode = iDepOfThese.reduce((nx, na) => {
+//                     const maxFutureDate = new Date(nx.data.end_date);
+//                     const actualFutureDate = new Date(na.data.end_date);
+//                     return actualFutureDate > maxFutureDate ? na : nx;
+//                 });
+//             }
+
+//             let suggestInitDate = parentStartDate;
+
+//             if (data.start_date && !parentStartDate) {
+//                 suggestInitDate = fixInitLaboralDay(data.start_date, 0);
+//             }
+
+//             if (parentNode && parentNode.data.end_date) {
+//                 suggestInitDate = fixInitLaboralDay(parentNode.data.end_date, 1);
+//             }
+
+//             data.start_date = suggestInitDate;
+
+//             if (data.start_date && !isNaN(data.days)) {
+//                 const end = calculateRangeLaboralDays(data.days, data.start_date);
+//                 data.end_date = end.toISOString().split('T')[0];
+//             }
+//         }
+//     });
+// }
 // 🔁 Reconstruye desde el árbol
 function reconstructProjectFromTree(treeNodes: any[]) {
     const root = treeNodes[0];
@@ -428,10 +475,6 @@ function recalculateEdt(nodes: any[], prefix = '') {
     nodes.forEach((node, i) => {
         const currentEdt = prefix ? `${prefix}.${i + 1}` : `${i + 1}`;
         node.data.index = currentEdt;
-
-        if (node.data.depends_on && node.data.depends_on !== '') {
-            node.data.depends_on = lastedt;
-        }
 
         if (node.children?.length) {
             recalculateEdt(node.children, currentEdt);

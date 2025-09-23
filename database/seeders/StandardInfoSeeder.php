@@ -57,7 +57,7 @@ class StandardInfoSeeder extends Seeder
             ['substatus' => 'Nuevo',     'color' => '#6c757d'], // gris
             ['substatus' => 'Asignado',     'color' => '#0d6efd'], // azul
             ['substatus' => 'Cancelado',     'color' => '#ffc107'], // amarillo
-            ['substatus' => 'Completado',      'color' => '#198754'], // verde
+            ['substatus' => 'Resuelta',      'color' => '#198754'], // verde
         ]);
         // Priorities
         DB::table('priorities')->insert([

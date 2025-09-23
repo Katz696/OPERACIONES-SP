@@ -84,7 +84,7 @@ class Delivery extends Model
 
     public function activities()
     {
-        return $this->hasMany(Activity::class);
+        return $this->hasMany(Activity::class)->orderBy('index');
     }
 
     public function tags()

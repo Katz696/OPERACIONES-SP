@@ -1,14 +1,16 @@
 import '../css/app.css';
 
 import { createInertiaApp } from '@inertiajs/vue3';
+import Aura from '@primeuix/themes/aura';
 import { resolvePageComponent } from 'laravel-vite-plugin/inertia-helpers';
+import naive from 'naive-ui';
+import { createPinia } from 'pinia';
+import PrimeVue from 'primevue/config';
 import type { DefineComponent } from 'vue';
 import { createApp, h } from 'vue';
 import { ZiggyVue } from 'ziggy-js';
 import { initializeTheme } from './composables/useAppearance';
-import { createPinia } from 'pinia';
-import hyvuegantt from 'hy-vue-gantt'
-import naive from 'naive-ui'
+
 const pinia = createPinia();
 const appName = import.meta.env.VITE_APP_NAME || 'Laravel';
 
@@ -20,8 +22,12 @@ createInertiaApp({
             .use(plugin)
             .use(ZiggyVue)
             .use(pinia)
-            .use(hyvuegantt)
             .use(naive)
+            .use(PrimeVue, {
+                theme: {
+                    preset: Aura,
+                },
+            })
             .mount(el);
     },
     progress: {

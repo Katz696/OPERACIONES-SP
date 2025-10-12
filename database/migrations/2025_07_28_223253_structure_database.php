@@ -65,6 +65,7 @@ return new class extends Migration
             $table->decimal('percentage_planned', 5, 2)->default(0);
             $table->decimal('percentage_progress', 5, 2)->default(0);
             $table->integer('days')->default(0);
+            $table->longText('comments')->nullable();
             $table->date('start_date')->nullable();
             $table->date('end_date')->nullable();
             $table->date('real_end_date')->nullable();
@@ -84,10 +85,11 @@ return new class extends Migration
             $table->id();
             $table->foreignId('project_id')->constrained('projects')->onDelete('cascade');
             $table->foreignId('status_id')->constrained('statuses')->default(1)->onDelete('cascade');
-            $table->foreignId('substatus_id')->constrained('substatuses')->default(1)->onDelete('cascade');
+            $table->foreignId('substatus_id')->nullable()->constrained('substatuses')->default(1)->onDelete('cascade');
             $table->string('title');
             $table->string('index');
             $table->integer('days')->default(0);
+            $table->longText('comments')->nullable();
             $table->decimal('percentage', 5, 2)->default(0);
             $table->decimal('percentage_planned', 5, 2)->default(0);
             $table->decimal('percentage_progress', 5, 2)->default(0);
@@ -105,13 +107,14 @@ return new class extends Migration
             $table->foreignId('project_id')->constrained('projects')->onDelete('cascade');
             $table->foreignId('phase_id')->constrained('phases')->onDelete('cascade');
             $table->foreignId('status_id')->constrained('statuses')->default(1)->onDelete('cascade');
-            $table->foreignId('substatus_id')->constrained('substatuses')->default(1)->onDelete('cascade');
+            $table->foreignId('substatus_id')->nullable()->constrained('substatuses')->default(1)->onDelete('cascade');
             $table->foreignId('priority_id')->constrained('priorities')->onDelete('cascade');
             $table->foreignId('user_id')->nullable()->constrained('users')->onDelete('cascade');
             $table->foreignId('sprint_id')->constrained('sprints')->onDelete('cascade');
             $table->string('index');
             $table->string('title');
             $table->integer('days')->default(0);
+            $table->longText('comments')->nullable();
             $table->decimal('percentage', 5, 2)->default(0);
             $table->decimal('percentage_planned', 5, 2)->default(0);
             $table->decimal('percentage_progress', 5, 2)->default(0);
@@ -129,7 +132,7 @@ return new class extends Migration
             $table->id();
             $table->foreignId('delivery_id')->constrained('deliveries')->onDelete('cascade');
             $table->foreignId('status_id')->constrained('statuses')->default(1)->onDelete('cascade');
-            $table->foreignId('substatus_id')->constrained('substatuses')->default(1)->onDelete('cascade');
+            $table->foreignId('substatus_id')->nullable()->constrained('substatuses')->default(1)->onDelete('cascade');
             $table->foreignId('priority_id')->constrained('priorities')->onDelete('cascade');
             $table->foreignId('user_id')->nullable()->constrained('users')->onDelete('cascade');
             $table->string('title');
@@ -138,6 +141,7 @@ return new class extends Migration
             $table->decimal('percentage_planned', 5, 2)->default(0);
             $table->decimal('percentage_progress', 5, 2)->default(0);
             $table->integer('days')->default(0);
+            $table->longText('comments')->nullable();
             $table->date('start_date')->nullable();
             $table->date('end_date')->nullable();
             $table->date('real_end_date')->nullable();

@@ -19,6 +19,7 @@ class Phase extends Model
         'title',
         'index',
         'days',
+        'comments',
         'percentage',
         'percentage_planned',
         'percentage_progress',

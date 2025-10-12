@@ -16,6 +16,7 @@ class Project extends Model
         'title',
         'status_id',
         'days',
+        'comments',
         'percentage',
         'percentage_planned',
         'percentage_progress',

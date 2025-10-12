@@ -1,189 +1,132 @@
-<template>
-    <g-gantt-chart v-bind="chartConfig">
-        <g-gantt-row
-            v-for="row in rows"
-            :key="row.label + '-' + row.bars[0].ganttBarConfig.id"
-            :label="row.label"
-            :bars="row.bars"
-        />
-    </g-gantt-chart>
-</template>
+<script setup>
+import { mapProjectToGantt } from '@/composables/useGanttMapper';
+import gantt from 'dhtmlx-gantt';
+import 'dhtmlx-gantt/codebase/dhtmlxgantt.css';
+import { onBeforeUnmount, onMounted, ref } from 'vue';
 
-<script setup lang="ts">
-import { useProjectStore } from '@/composables/useProjectStore';
-import { computed, ref, watch } from 'vue';
-import { ProjectData } from "@/types/treeproject";
-
-const store = useProjectStore();
-
-const project = computed<ProjectData | null>(() => {
-  return store.editable?.project ?? null
+onBeforeUnmount(() => {
+    gantt.clearAll();
 });
 
-const rows = ref<any[]>([]);
+const ganttChart = ref(null);
 
-// Config base del chart
-const chartConfig = {
-    chartStart: ref('2025-01-01 00:00'),
-    chartEnd: ref('2025-12-31 23:59'),
-    precision: 'day',
-    barStart: 'start',
-    barEnd: 'end',
-    dateFormat: 'YYYY-MM-DD HH:mm',
-    rowHeight: 30,
-    grid: true,
-    pushOnOverlap: true,
-    colorScheme: 'default',
-};
+onMounted(() => {
+    gantt.clearAll();
+    const { data, links, start_date, end_date } = mapProjectToGantt();
 
-function prefixedId(type: 'project' | 'phase' | 'delivery' | 'activity', id: number | string) {
-    return `${type}-${id}`;
-}
+    gantt.plugins({
+        marker: true,
+        tooltip: true,
+        baseline: true,
+    });
 
-function mapTreeToRows(proj: any) {
-    const projectRows: any[] = [];
-    const startDate = new Date(proj.data.start_date);
-    const endDate = new Date(proj.data.end_date);
-    startDate.setDate(startDate.getDate() - 2);
-    endDate.setDate(endDate.getDate() + 2);
-    let minDate = startDate.toISOString().split('T')[0] + ' 00:00';
-    let maxDate = endDate.toISOString().split('T')[0] + ' 23:59';
-
-    // Proyecto
-    projectRows.push({
-        label: 'Proyecto',
-        bars: [
-            {
-                start: proj.data.start_date + ' 07:00',
-                end: proj.data.end_date + ' 19:00',
-                ganttBarConfig: {
-                    id: prefixedId('project', proj.data.id),
-                    label: proj.data.title,
-                    progress: proj.data.percentage,
-                    style: {
-                        background: '#D46363',
-                        borderRadius: '20px',
-                    },
-                },
+    gantt.i18n.setLocale('es');
+    gantt.config.grid_width = 250;
+    gantt.config.row_height = 40;
+    gantt.config.bar_height = 20;
+    gantt.config.columns = [
+        { name: 'text', label: 'Tarea', tree: true, width: 250 },
+        {
+            name: 'estado',
+            label: '',
+            width: 30,
+            template: function (task) {
+                switch (task.state) {
+                    case 1:
+                        return '<span style="color:gray;">⏻</span>';
+                    case 2:
+                        return '▶️';
+                    case 3:
+                        return '✅';
+                    case 4:
+                        return '⛔';
+                    case 5:
+                        return '⚠️';
+                    default:
+                        return '';
+                }
             },
-        ],
+        },
+    ];
+
+    gantt.config.readonly = true;
+    gantt.config.work_time = true;
+    gantt.config.skip_off_time = true;
+    gantt.config.duration_unit = 'day';
+    gantt.config.correct_work_time = true;
+    gantt.config.xml_date = '%Y-%m-%d';
+    gantt.config.min_column_width = 50;
+    gantt.config.scale_height = 90;
+
+    gantt.config.scales = [
+        { unit: 'year', step: 1, format: '%Y' },
+        { unit: 'month', step: 1, format: '%F' },
+    ];
+    //gantt.config.fit_tasks = true;
+    // gantt.config.start_date = start_date;
+    // gantt.config.end_date = end_date;
+
+    gantt.templates.task_text = () => '';
+    gantt.templates.progress_text = (start, end, task) => `<span style='text-align:right;'>${Math.round(task.progress * 100)}%</span>`;
+    gantt.templates.task_class = (start, end, task) => 'gantt_' + task.type;
+    gantt.templates.rightside_text = function (start, end, task) {
+        return '';
+    };
+    gantt.init(ganttChart.value);
+
+    gantt.parse({ data, links });
+
+    const dateToStr = gantt.date.date_to_str(gantt.config.task_date);
+    gantt.addMarker({
+        start_date: new Date(),
+        text: 'hoy',
+        css: 'today-line',
+        title: dateToStr(new Date()),
     });
 
-    // Fases
-    proj.phases.forEach((phase: any) => {
-        projectRows.push({
-            label: `${phase.data.index}`,
-            bars: [
-                {
-                    start: phase.data.start_date + ' 07:00',
-                    end: phase.data.end_date + ' 19:00',
-                    ganttBarConfig: {
-                        id: prefixedId('phase', phase.data.id),
-                        label: phase.data.title,
-                        progress: phase.data.percentage,
-                        style: {
-                            background: '#D48E63',
-                            borderRadius: '20px',
-                        },
-                        connections: phase.data.depends_me
-                            ? phase.data.depends_me.map((r: number) => ({
-                                  targetId: prefixedId('phase', r),
-                                  type: 'squared',
-                                  animated: true,
-                                  relation: 'FS',
-                                  label: 'Prerequisite',
-                                  color: '#D48E63',
-                              }))
-                            : [],
-                    },
-                },
-            ],
-        });
-
-        // Entregas
-        phase.deliveries.forEach((delivery: any) => {
-            projectRows.push({
-                label: `${delivery.data.index}`,
-                bars: [
-                    {
-                        start: delivery.data.start_date + ' 07:00',
-                        end: delivery.data.end_date + ' 19:00',
-                        ganttBarConfig: {
-                            id: prefixedId('delivery', delivery.data.id),
-                            label: delivery.data.title,
-                            progress: delivery.data.percentage,
-                            style: {
-                                background: '#D4A963',
-                                borderRadius: '20px',
-                            },
-                            connections: delivery.data.depends_me
-                                ? delivery.data.depends_me.map((r:number) => (
-                                      {
-                                          targetId: prefixedId('delivery', r),
-                                          type: 'squared',
-                                          animated: true,
-                                          relation: 'FS',
-                                          label: 'Prerequisite',
-                                          color: '#D4A963',
-                                      }))
-                                : [],
-                        },
-                    },
-                ],
-            });
-
-            // Actividades
-            // delivery.activities.forEach((act: any) => {
-            //     projectRows.push({
-            //         label: `Actividad ${act.data.index}`,
-            //         bars: [
-            //             {
-            //                 start: act.data.start_date + ' 07:00',
-            //                 end: act.data.end_date + ' 19:00',
-            //                 ganttBarConfig: {
-            //                     id: prefixedId('activity', act.data.id),
-            //                     label: act.data.title,
-            //                     progress: act.data.percentage,
-            //                     style: {
-            //                         background: '#D4D463',
-            //                         borderRadius: '20px',
-            //                     },
-            //                     connections: act.data.depends_on
-            //                         ? [
-            //                               {
-            //                                   targetId: prefixedId('activity', act.data.depends_on),
-            //                                   type: 'squared',
-            //                                   animated: true,
-            //                                   relation: 'FS',
-            //                                   label: 'Prerequisite',
-            //                                   color: '#D4D463',
-            //                               },
-            //                           ]
-            //                         : []
-            //                 },
-            //             },
-            //         ],
-            //     });
-            // });
-        });
-    });
-
-    return { projectRows, minDate, maxDate };
-}
-
-// 🔄 Watch para actualizar rows y chart cuando el proyecto cambia
-watch(project, (newProj) => {
-    if (newProj) {
-        const { projectRows, minDate, maxDate } = mapTreeToRows(newProj);
-        rows.value = projectRows;
-        chartConfig.chartStart.value = minDate;
-        chartConfig.chartEnd.value = maxDate;
-    }
-}, { immediate: true });
+    gantt.templates.tooltip_text = function (start, end, task) {
+        return `
+      <b>${task.text}</b><br/>
+      Inicio: ${gantt.templates.date_grid(start)}<br/>
+      Fin: ${gantt.templates.date_grid(end)}<br/>
+      Duracion: ${task.duration} dias <br/>
+      % Avance: ${task.progress * 100 || 0}%<br/>
+      % Planeado: ${task.planned}%<br/>
+      SPI: ${task.spi}
+    `;
+    };
+});
 </script>
 
+<template>
+    <div ref="ganttChart" style="width: 100%; height: 750px"></div>
+</template>
+
 <style>
-.g-gantt-chart {
-    display: block;
+.gantt_good {
+    --dhx-gantt-task-background: #21b621;
+}
+.gantt_alert {
+    --dhx-gantt-task-background: #f3ff47; /* verde */
+}
+.gantt_warnning {
+    --dhx-gantt-task-background: #ff0000; /* amarillo */
+}
+.gantt_milest {
+    --dhx-gantt-task-background: #000000;
+}
+.gantt_task_progress {
+    text-align: right;
+    box-sizing: border-box;
+    color: white;
+    font-weight: bold;
+}
+.gantt_task_cell.week_end,
+.gantt_task_cell.no_work_hour {
+    background-color: var(--dhx-gantt-base-colors-background-alt);
+}
+
+.gantt_task_row.gantt_selected .gantt_task_cell.week_end {
+    background-color: var(--dhx-gantt-base-colors-select);
 }
 </style>

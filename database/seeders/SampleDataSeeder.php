@@ -39,7 +39,7 @@ class SampleDataSeeder extends Seeder
             $phase = Phase::create([
                 'project_id' => $project->id,
                 'status_id' => DB::table('statuses')->where('status', 'No iniciado')->value('id'),
-                'substatus_id' => DB::table('substatuses')->where('substatus', 'Nuevo')->value('id'),
+                'substatus_id' => DB::table('substatuses')->where('substatus', 'Por Iniciar')->value('id'),
                 'title' => 'Fase Inicial',
                 'index' => '1.1',
                 'days' => 10,
@@ -50,7 +50,7 @@ class SampleDataSeeder extends Seeder
                 'project_id' => $project->id,
                 'phase_id' => $phase->id,
                 'status_id' => DB::table('statuses')->where('status', 'No iniciado')->value('id'),
-                'substatus_id' => DB::table('substatuses')->where('substatus', 'Nuevo')->value('id'),
+                'substatus_id' => DB::table('substatuses')->where('substatus', 'Por Iniciar')->value('id'),
                 'priority_id' => DB::table('priorities')->where('priority', 'Media')->value('id'),
                 'user_id' => $user->id,
                 'sprint_id' => DB::table('sprints')->first()->id,
@@ -62,7 +62,7 @@ class SampleDataSeeder extends Seeder
             Activity::create([
                 'delivery_id' => $delivery->id,
                 'status_id' => DB::table('statuses')->where('status', 'No iniciado')->value('id'),
-                'substatus_id' => DB::table('substatuses')->where('substatus', 'Nuevo')->value('id'),
+                'substatus_id' => DB::table('substatuses')->where('substatus', 'Por Iniciar')->value('id'),
                 'priority_id' => DB::table('priorities')->where('priority', 'Alta')->value('id'),
                 'user_id' => $user->id,
                 'title' => 'Actividad 1',

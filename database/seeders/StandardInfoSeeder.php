@@ -46,19 +46,17 @@ class StandardInfoSeeder extends Seeder
         DB::table('statuses')->insert([
             ['status' => 'No iniciado',     'color' => '#6c757d'], // gris
             ['status' => 'En progreso',     'color' => '#0d6efd'], // azul
-            ['status' => 'En revisión',     'color' => '#ffc107'], // amarillo
-            ['status' => 'Completado',      'color' => '#198754'], // verde
-            ['status' => 'Cancelado',       'color' => '#dc3545'], // rojo
-            ['status' => 'Aplazado',        'color' => '#fd7e14'], // naranja
+            ['status' => 'Completado',     'color' => '#ffc107'], // amarillo
         ]);
 
         // Statuses
         DB::table('substatuses')->insert([
-            ['substatus' => 'Nuevo',     'color' => '#6c757d'], // gris
-            ['substatus' => 'Asignado',     'color' => '#0d6efd'], // azul
-            ['substatus' => 'Cancelado',     'color' => '#ffc107'], // amarillo
-            ['substatus' => 'Resuelta',      'color' => '#198754'], // verde
+            ['substatus' => '',     'color' => '#6c757d'], // gris
+            ['substatus' => 'EVAL (Evaluación, Validación y Ajustes)',     'color' => '#ffc107'], // amarillo
+            ['substatus' => 'Aceptado Verbal',      'color' => '#198754'], // verde
+            ['substatus' => 'Aceptado Firmado',      'color' => '#198754'],
         ]);
+
         // Priorities
         DB::table('priorities')->insert([
             ['priority' => 'Baja',     'color' => '#6c757d'], // gris

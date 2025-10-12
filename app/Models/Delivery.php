@@ -26,6 +26,7 @@ class Delivery extends Model
         'percentage_planned',
         'percentage_progress',
         'days',
+        'comments',
         'start_date',
         'end_date',
         'real_end_date',

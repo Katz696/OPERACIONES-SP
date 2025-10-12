@@ -1,9 +1,43 @@
 <template>
     <div class="w-full space-y-2">
-        <!-- Botón agregar -->
-        <div class="flex justify-end">
-            <n-button type="success" round @click="addRow" title="Añadir Proyecto"> ➕ Agregar </n-button>
+        <!-- Controles superiores -->
+        <!-- Contenedor de filtros -->
+        <div class="flex flex-wrap items-end gap-4">
+            <!-- Filtro Cliente -->
+            <div class="flex flex-col">
+                <label for="filter-customer" class="mb-1 text-xs font-semibold text-gray-600"> Filtrar por cliente </label>
+                <n-select
+                    id="filter-customer"
+                    v-model:value="filterCustomer"
+                    :options="customerOptions"
+                    filterable
+                    clearable
+                    placeholder="Selecciona un cliente"
+                    size="small"
+                    class="w-52"
+                />
+            </div>
+
+            <!-- Filtro Estado -->
+            <div class="flex flex-col gfap-4">
+                <label for="filter-status" class="mb-1 text-xs font-semibold text-gray-600"> Filtrar por estado </label>
+                <n-select
+                    id="filter-status"
+                    v-model:value="filterStatus"
+                    :options="statusOptions"
+                    clearable
+                    placeholder="Selecciona un estado"
+                    size="small"
+                    class="w-40"
+                />
+            </div>
+
+            <!-- Botón agregar -->
+            <div class="flex flex-grow justify-end">
+                <n-button type="success" round @click="addRow" title="Añadir Proyecto"> ➕ Agregar </n-button>
+            </div>
         </div>
+
         <!-- Encabezados -->
         <div
             class="grid grid-cols-[40px_200px_200px_200px_100px_80px_80px_120px_120px_80px_80px] gap-2 rounded bg-gray-100 p-2 text-xs font-semibold text-gray-700"
@@ -20,9 +54,10 @@
             <div class="text-center">Gestionar</div>
             <div class="text-center">Eliminar</div>
         </div>
+
         <!-- Filas -->
         <div
-            v-for="(p, index) in store.edit"
+            v-for="(p, index) in filteredProjects"
             :key="p.id ?? `new-${index}`"
             class="grid grid-cols-[40px_200px_200px_200px_100px_80px_80px_120px_120px_80px_80px] items-center gap-2 border-b bg-white p-2 text-sm transition hover:bg-gray-50"
         >
@@ -67,14 +102,15 @@
 
             <n-button round @click="removeRow(index)" type="Error" title="Eliminar">🗑️</n-button>
         </div>
+
         <!-- Overlay spinner -->
         <div v-if="loading" class="absolute inset-0 z-50 flex items-center justify-center bg-black/30">
             <div class="h-12 w-12 animate-spin rounded-full border-4 border-white border-t-transparent"></div>
         </div>
+
+        <!-- Botones de guardar -->
         <div v-if="store.hasChanges" class="mt-2 flex justify-end gap-2">
-            <!-- Guardar cambios -->
             <n-button @click="saveChanges" round type="Primary"> 💾 Guardar Cambios </n-button>
-            <!-- Descartar cambios -->
             <n-button @click="store.discardChanges" round type="Warning"> ❌ Descartar Cambios </n-button>
         </div>
     </div>
@@ -86,25 +122,6 @@ import type { Customer, User } from '@/types/catalogs';
 import axios from 'axios';
 import { computed, ref, watch } from 'vue';
 
-const customerOptions = computed(() =>
-    customers.value.map((c) => ({
-        label: c.name, // lo que se muestra
-        value: c.id, // lo que se guarda en p.customer_id
-    })),
-);
-const usersOptions = computed(() =>
-    users.value.map((c) => ({
-        label: c.name, // lo que se muestra
-        value: c.id, // lo que se guarda en p.customer_id
-    })),
-);
-
-const disableWeekends = (ts: any) => {
-    const day = new Date(ts).getDay();
-    // 0 = domingo, 6 = sábado
-    return day === 0 || day === 6;
-};
-// Store
 const store = useProjectStore();
 const storeUsers = useUserStore();
 const storeCustomers = useCustomersStore();
@@ -129,7 +146,45 @@ watch(
     { immediate: true },
 );
 
-// Guardar cambios
+const customerOptions = computed(() =>
+    customers.value.map((c) => ({
+        label: c.name,
+        value: c.id,
+    })),
+);
+
+const usersOptions = computed(() =>
+    users.value.map((c) => ({
+        label: c.name,
+        value: c.id,
+    })),
+);
+
+// 🔹 Opciones de estado (puedes reemplazar con tus datos reales)
+const statusOptions = computed(() => {
+    const statuses = new Set(store.edit?.map((p) => p.status.status));
+    return Array.from(statuses).map((s) => ({ label: s, value: s }));
+});
+
+// Filtros
+const filterCustomer = ref<number | null>(null);
+const filterStatus = ref<string | null>(null);
+
+// Proyectos filtrados
+const filteredProjects = computed(() => {
+    if (!store.edit) return [];
+    return store.edit.filter((p) => {
+        const matchCustomer = !filterCustomer.value || p.customer_id === filterCustomer.value;
+        const matchStatus = !filterStatus.value || p.status.status === filterStatus.value;
+        return matchCustomer && matchStatus;
+    });
+});
+
+const disableWeekends = (ts: any) => {
+    const day = new Date(ts).getDay();
+    return day === 0 || day === 6;
+};
+
 const loading = ref(false);
 
 async function saveChanges() {
@@ -164,13 +219,13 @@ async function saveChanges() {
         loading.value = false;
     }
 }
-// Eliminar fila
+
 function removeRow(index: number) {
     if (store.edit !== null) {
         store.edit.splice(index, 1);
     }
 }
-// Agregar fila
+
 function addRow() {
     if (store.edit === null) {
         store.edit = [];

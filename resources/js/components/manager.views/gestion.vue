@@ -1,25 +1,38 @@
 <template>
-    <div class="flex w-full items-start gap-2 pl-4 text-sm font-semibold">
-        <div class="w-14">Tipo</div>
-        <div class="w-16">EDT</div>
-        <div class="w-48">Titulo</div>
-        <div class="w-30">Predecesor</div>
-        <div class="w-14">Días</div>
-        <div class="w-30">Fecha inicio</div>
-        <div class="w-30">Fecha fin</div>
-        <div class="w-33">Estado</div>
-        <div class="w-30">Sub Estado</div>
-        <div class="w-15">%</div>
-        <div class="w-14">(%)</div>
-        <div class="w-25">Prioridad</div>
-        <div class="w-25">Sprint</div>
-        <div class="w-30">Responsable</div>
-        <div class="w-15">Eliminar</div>
+  <div class="overflow-x-auto">
+    <!-- Cabecera -->
+    <div class="flex items-start gap-2 pl-4 text-sm font-semibold min-w-max">
+      <div class="w-14">Tipo</div>
+      <div class="w-16">EDT</div>
+      <div class="w-48">Titulo</div>
+      <div class="w-30">Predecesor</div>
+      <div class="w-14">Días</div>
+      <div class="w-30">Fecha inicio</div>
+      <div class="w-30">Fecha fin</div>
+      <div class="w-33">Estado</div>
+      <div class="w-50">Sub Estado</div>
+      <div class="w-15">%AR</div>
+      <div class="w-14">%AP</div>
+      <!-- <div class="w-25">Prioridad</div>
+      <div class="w-25">Sprint</div> -->
+      <div class="w-47">Comentarios</div>
+      <div class="w-30">Responsable</div>
+      <div class="w-15">Eliminar</div>
     </div>
-    <div>
-        <n-tree :data="treeData" :render-label="renderLabel" :default-expand-all="true" show-line :indent="18" />
+
+    <!-- Contenido -->
+    <div class="min-w-max">
+      <n-tree
+        :data="treeData"
+        :render-label="renderLabel"
+        :default-expand-all="true"
+        show-line
+        :indent="18"
+      />
     </div>
+  </div>
 </template>
+
 <script setup lang="ts">
 import TreeNodeLabel from '@/components/TreeNodeLabel.vue';
 import { useProjectStore } from '@/composables/useProjectStore';
@@ -90,7 +103,8 @@ function onEdit() {
 }
 function applyProcessToProject() {
     propagateDatesTopDown(treeData.value);
-    globalSort();
+    sortTreeByEndDate(treeData.value);
+    //globalSort();
     recalculateEdt(treeData.value);
     updateStatusAndProgress(treeData.value);
     calculatePercentPlannedBottomUp(treeData.value);
@@ -104,50 +118,34 @@ function forceRefreshTree() {
 //calcular estados
 function updateStatusAndProgress(nodes: any[]): void {
     nodes.forEach((node) => {
-        // Primero actualizar hijos recursivamente
+        // 1. Si tiene hijos, procesarlos primero
         if (node.children?.length) {
             updateStatusAndProgress(node.children);
-
-            const allChildrenCompletedOrCancelled = node.children.every((child: any) => [4, 5].includes(child.data.status_id));
-
-            // Si todos los hijos están completados o cancelados
-            if (allChildrenCompletedOrCancelled) {
-                node.data.status_id = 4; // Completado
-                node.data.percentage = 100;
-                node.data.percentage_progress = 100;
-            }
-
-            // Si el nodo está marcado como Completado pero su porcentaje es < 100, bajarlo a En Progreso
-            else if (node.data.status_id === 4 && node.data.percentage < 100) {
-                node.data.status_id = 2; // En progreso
-            }
-
-            // Si está en "No iniciado" y tiene avance, pasarlo a "En progreso"
-            else if (node.data.status_id === 1 && node.data.percentage > 0) {
-                node.data.status_id = 2;
-            }
-        } else {
-            const actPercent = node.data.percentage;
-            // Nodo hoja (actividad)
-            if (node.data.percentage === 100) {
-                node.data.status_id = 4;
-            }
-            if ([4, 5].includes(node.data.status_id)) {
-                node.data.percentage = 100;
-                node.data.percentage_progress = 100;
-            }
-
-            if (node.data.status_id === 1 && node.data.percentage > 0) {
-                node.data.status_id = 2;
-            }
-
-            // Si está en Completado pero ya no tiene 100%
-            if (node.data.status_id === 4 && node.data.percentage < 100) {
-                node.data.status_id = 2;
-            }
         }
+
+        // 2. Si el padre está cancelado (4) o detenido (5), propaga a hijos
+        if (node.children?.length && (node.data.status_id === 4 || node.data.status_id === 5)) {
+            node.children.forEach((child: any) => {
+                child.data.status_id = node.data.status_id;
+            });
+        }
+
+        // 3. Calcular el estado del nodo actual (sea padre o hijo)
+        if (node.data.status_id === 4 || node.data.status_id === 5) {
+            // Si sigue en cancelado/detenido, respetar
+        } else if (node.data.percentage === 100) {
+            node.data.status_id = 3; // Completado
+        } else if (node.data.percentage > 0) {
+            node.data.status_id = 2; // En progreso
+        } else {
+            node.data.status_id = 1; // No iniciado
+        }
+
+        // 4. Ajusta porcentaje de progreso
+        node.data.percentage_progress = node.data.percentage;
     });
 }
+
 //calcular porcentajes
 function calculatePercentCompletedBottomUp(nodes: any[]): void {
     nodes.forEach((node) => {
@@ -155,8 +153,12 @@ function calculatePercentCompletedBottomUp(nodes: any[]): void {
             let totalDays = 0;
             let weightedSum = 0;
 
-            node.children.forEach((child: { data: { days: number; percentage: number } }) => {
+            node.children.forEach((child: any) => {
                 calculatePercentCompletedBottomUp([child]); // primero hijos
+                // ⚡ ignorar hijos cancelados
+                if (child.data.status_id === 5) {
+                    return;
+                }
                 const childDays = child.data.days || 0;
                 const childPercent = child.data.percentage || 0;
 
@@ -175,6 +177,39 @@ function getTodayLocalDate(): Date {
     const now = new Date();
     return new Date(now.getFullYear(), now.getMonth(), now.getDate()); // sin hora
 }
+// function calculatePercentPlannedBottomUp(nodes: any[], today: Date = new Date()): void {
+//     today = getTodayLocalDate(); // corregir zona horaria
+//     nodes.forEach((node) => {
+//         if (node.children?.length) {
+//             let totalDays = 0;
+//             let weightedSum = 0;
+
+//             node.children.forEach((child: { data: { days: number; percentage_planned: number } }) => {
+//                 calculatePercentPlannedBottomUp([child], today);
+//                 const childDays = child.data.days || 0;
+//                 const childPlanned = child.data.percentage_planned || 0;
+
+//                 weightedSum += childPlanned * childDays;
+//                 totalDays += childDays;
+//             });
+
+//             node.data.percentage_planned = totalDays > 0 ? +(weightedSum / totalDays).toFixed(2) : 0;
+//         } else {
+//             // nodo hoja: calcular días transcurridos desde start_date
+//             const startStr = node.data.start_date;
+//             const totalDays = node.data.days || 0;
+
+//             if (startStr && totalDays > 0) {
+//                 const start = new Date(startStr);
+//                 const passed = getWorkingDaysBetween(start, today);
+//                 const capped = Math.min(passed, totalDays);
+//                 node.data.percentage_planned = +((100 * capped) / totalDays).toFixed(2);
+//             } else {
+//                 node.data.percentage_planned = 0;
+//             }
+//         }
+//     });
+// }
 function calculatePercentPlannedBottomUp(nodes: any[], today: Date = new Date()): void {
     today = getTodayLocalDate(); // corregir zona horaria
     nodes.forEach((node) => {
@@ -182,8 +217,14 @@ function calculatePercentPlannedBottomUp(nodes: any[], today: Date = new Date())
             let totalDays = 0;
             let weightedSum = 0;
 
-            node.children.forEach((child: { data: { days: number; percentage_planned: number } }) => {
+            node.children.forEach((child: any) => {
                 calculatePercentPlannedBottomUp([child], today);
+
+                // ⚡ ignorar hijos cancelados
+                if (child.data.status_id === 5) {
+                    return;
+                }
+
                 const childDays = child.data.days || 0;
                 const childPlanned = child.data.percentage_planned || 0;
 
@@ -208,6 +249,7 @@ function calculatePercentPlannedBottomUp(nodes: any[], today: Date = new Date())
         }
     });
 }
+
 function getWorkingDaysBetween(start: Date, end: Date): number {
     let count = 0;
     const current = new Date(start);
@@ -269,7 +311,6 @@ function propagateDatesTopDown(nodes: any[], parentStartDate: string | null = nu
 
         // Si tiene un padre, forzamos que tome el start_date en base al padre
         if (parentStartDate) {
-            // Si depende de alguien explícitamente (i_depend), tomamos ese como prioridad
             let suggestInitDate = parentStartDate;
 
             if (data.i_depend && Array.isArray(data.i_depend) && data.i_depend.length > 0) {
@@ -295,23 +336,40 @@ function propagateDatesTopDown(nodes: any[], parentStartDate: string | null = nu
         if (node.children?.length) {
             propagateDatesTopDown(node.children, data.start_date);
 
-            // Después de propagar, ajustamos fechas del padre
-            const mindate = node.children.reduce((nx: any, na: any) => {
-                const min = new Date(nx.data.start_date);
-                const actual = new Date(na.data.start_date);
-                return min > actual ? na : nx;
-            });
-            const maxdate = node.children.reduce((nx: any, na: any) => {
-                const max = new Date(nx.data.end_date);
-                const actual = new Date(na.data.end_date);
-                return max < actual ? na : nx;
-            });
+            // --- Ajustamos fechas del padre en base a los hijos ---
+            const validChildren = node.children.filter(
+                (c: any) => c.data.days > 0
+            );
 
-            data.days = calculateDurationDays(mindate.data.start_date, maxdate.data.end_date);
-            data.end_date = maxdate.data.end_date;
+            if (validChildren.length > 0) {
+                const mindate = validChildren.reduce((nx: any, na: any) => {
+                    const min = new Date(nx.data.start_date);
+                    const actual = new Date(na.data.start_date);
+                    return min > actual ? na : nx;
+                });
+                const maxdate = validChildren.reduce((nx: any, na: any) => {
+                    const max = new Date(nx.data.end_date);
+                    const actual = new Date(na.data.end_date);
+                    return max < actual ? na : nx;
+                });
+
+                data.days = calculateDurationDays(mindate.data.start_date, maxdate.data.end_date);
+                data.end_date = maxdate.data.end_date;
+            } else {
+                // 🧩 Si no hay hijos válidos o todos tienen duración 0
+                data.days = 0;
+                data.end_date = data.start_date;
+            }
+        } else {
+            // 🧩 Si no tiene hijos y su propia duración no está definida, forzamos a 0
+            if (!data.days || data.days <= 0) {
+                data.days = 0;
+                data.end_date = data.start_date;
+            }
         }
     });
 }
+
 
 // function propagateDatesTopDown(nodes: any[], parentStartDate: string | null = null) {
 //     nodes.forEach((node) => {
@@ -388,7 +446,7 @@ function addChild(node: any) {
                 id: null,
                 project_id: node.data.id,
                 status_id: 1,
-                substatus_id: 1,
+                substatus_id: null,
                 user_id: null,
                 title: 'Ingrese el titulo de la fase',
                 index: 0,
@@ -435,7 +493,7 @@ function addChild(node: any) {
                 id: null,
                 delivery_id: node.data.id,
                 status_id: 1,
-                substatus_id: 1,
+                substatus_id: null,
                 priority_id: 1,
                 user_id: null,
                 index: node.children.length,
@@ -483,17 +541,65 @@ function recalculateEdt(nodes: any[], prefix = '') {
     });
 }
 //buscar hermanos disponibles:
+function collectAllDepends(node: any, siblings: any[]): number[] {
+    const visited = new Set<number>();
+    const stack: number[] = [];
+
+    // Paso 1: buscar quienes dependen de mí directamente
+    siblings.forEach(sib => {
+        if (sib.data.i_depend?.includes(node.data.id)) {
+            stack.push(sib.data.id);
+        }
+    });
+
+    // Paso 2: recorrer en cascada todos los que dependan de esos
+    while (stack.length) {
+        const depId = stack.pop()!;
+        if (!visited.has(depId)) {
+            visited.add(depId);
+
+            const depNode = siblings.find(sib => sib.data.id === depId);
+            if (depNode) {
+                siblings.forEach(sib => {
+                    if (sib.data.i_depend?.includes(depNode.data.id)) {
+                        stack.push(sib.data.id);
+                    }
+                });
+            }
+        }
+    }
+
+    return Array.from(visited);
+}
+
+
+// function getSiblingOptions(node: any) {
+//     let siblings = findLevelTree(treeData.value, node);
+//     if (!siblings) return [];
+//     siblings = siblings.children;
+//     const meDepends: number[] = node.data.depends_me ?? [];
+//     return siblings.map((sib: any) => ({
+//         label: sib.data.index,
+//         key: sib.data.id,
+//         disabled: meDepends.includes(sib.data.id) || sib.key === node.key,
+//     }));
+// }
+
 function getSiblingOptions(node: any) {
-    let siblings = findLevelTree(treeData.value, node);
-    if (!siblings) return [];
-    siblings = siblings.children;
-    const meDepends: number[] = node.data.depends_me ?? [];
+    let siblingsContainer = findLevelTree(treeData.value, node);
+    if (!siblingsContainer) return [];
+    const siblings = siblingsContainer.children;
+
+    // obtener toda la cola de dependencias
+    const allDepends = collectAllDepends(node, siblings);
+
     return siblings.map((sib: any) => ({
         label: sib.data.index,
         key: sib.data.id,
-        disabled: meDepends.includes(sib.data.id) || sib.key === node.key,
+        disabled: allDepends.includes(sib.data.id) || sib.key === node.key,
     }));
 }
+
 function findLevelTree(level: any[], node: any): any {
     for (const element of level) {
         if (element.children?.some((child: any) => child.key === node.key)) {
@@ -505,19 +611,38 @@ function findLevelTree(level: any[], node: any): any {
         }
     }
 }
-//ordenamiento global por dependencias
-function globalSort() {
-    function sort(tree: any) {
-        for (const leaf of tree) {
-            if (leaf.children) {
-                sort(leaf.children);
-            } else {
-                tree.children = orderBasedInDepends(tree, leaf);
+//ordenamiento por fecha de termino
+function sortTreeByEndDate(nodes: any[]): any[] {
+    if (!Array.isArray(nodes)) return nodes;
+
+    return nodes
+        .map(node => {
+            // Ordenamos recursivamente los hijos si existen
+            if (node.children?.length) {
+                node.children = sortTreeByEndDate(node.children);
             }
-        }
-    }
-    sort(treeData.value);
+            return node;
+        })
+        .sort((a, b) => {
+            const endA = new Date(a.data.end_date).getTime();
+            const endB = new Date(b.data.end_date).getTime();
+            return endA - endB;
+        });
 }
+
+//ordenamiento global por dependencias
+// function globalSort() {
+//     function sort(tree: any) {
+//         for (const leaf of tree) {
+//             if (leaf.children) {
+//                 sort(leaf.children);
+//             } else {
+//                 tree.children = orderBasedInDepends(tree, leaf);
+//             }
+//         }
+//     }
+//     sort(treeData.value);
+// }
 //ordenamiento dependencias
 function orderBasedInDepends(nodes: any[], node: any): any[] {
     if (node.data.i_depend === null || (Array.isArray(node.data.i_depend) && node.data.i_depend.length === 0)) return nodes;

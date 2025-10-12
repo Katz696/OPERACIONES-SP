@@ -20,8 +20,9 @@ export interface Activity {
         restriction_start_date: string
         restriction_end_date: string
         activity_id: number | null
-        depends_me: string | null
-        i_depend: string | null
+        depends_me: string[] | null
+        i_depend: string[] | null
+        comments: string | null
     }
 }
 
@@ -46,8 +47,9 @@ export interface Delivery {
         real_end_date: string
         restriction_start_date: string
         restriction_end_date: string
-        depends_me: string | null
-        i_depend: string | null
+        depends_me: string[] | null
+        i_depend: string[] | null
+        comments: string | null
     }
     activities: Activity[]
 }
@@ -69,8 +71,9 @@ export interface Phase {
         real_end_date: string
         restriction_start_date: string
         restriction_end_date: string
-        depends_me: string | null
-        i_depend: string | null
+        depends_me: string[] | null
+        i_depend: string[] | null
+        comments: string | null
     }
     deliveries: Delivery[]
 }
@@ -92,6 +95,7 @@ export interface ProjectData {
         real_end_date: string
         restriction_start_date: string
         restriction_end_date: string
+        comments: string | null
     }
     phases: Phase[]
 }

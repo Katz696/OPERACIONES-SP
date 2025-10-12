@@ -4,28 +4,78 @@
     <AppLayout :breadcrumbs="breadcrumbs">
         <div class="flex h-full flex-1 flex-col gap-4 overflow-x-auto rounded-xl p-4">
             <div class="p-4">
-                <ProjectHeader v-if="projectStore.editable"/>
+                <ProjectHeader v-if="projectStore.editable" />
                 <PlaceholderPattern v-else text="Cargando proyecto..." />
 
                 <div class="mb-4 flex space-x-4 border-b">
-                    <button
-                        v-for="tab in tabs"
-                        :key="tab"
-                        @click="activeTab = tab"
-                        class="border-b-2 pb-2 font-semibold"
-                        :class="{
-                            'border-blue-500 text-blue-600': activeTab === tab,
-                            'border-transparent text-gray-500 hover:text-blue-600': activeTab !== tab,
-                        }"
-                    >
-                        {{ tab }}
-                    </button>
+                    <n-button-group size="small">
+                        <n-button round @click="activeTab = 'EDT'" :color="activeTab == 'EDT' ? '#ABABAB' : ''">
+                            <template #icon>
+                                <n-icon>
+                                    <DocumentOutline />
+                                </n-icon>
+                            </template>
+                            Cronograma
+                        </n-button>
+                        <n-button round @click="activeTab = 'EDT Organigrama'" :color="activeTab == 'EDT Organigrama' ? '#ABABAB' : ''">
+                            <template #icon>
+                                <n-icon>
+                                    <DocumentOutline />
+                                </n-icon>
+                            </template>
+                            EDT
+                        </n-button>
+                        <n-button round @click="activeTab = 'Tablero de control'" :color="activeTab == 'Tablero de control' ? '#ABABAB' : ''">
+                            <template #icon>
+                                <n-icon>
+                                    <DocumentOutline />
+                                </n-icon>
+                            </template>
+                            Tablero de control
+                        </n-button>
+                        <n-button round @click="activeTab = 'Gantt Extendido'" :color="activeTab == 'Gantt Extendido' ? '#ABABAB' : ''">
+                            <template #icon>
+                                <n-icon>
+                                    <DocumentOutline />
+                                </n-icon>
+                            </template>
+                            Gantt X Tarea
+                        </n-button>
+                        <n-button round @click="activeTab = 'Gantt Entregables'" :color="activeTab == 'Gantt Entregables' ? '#ABABAB' : ''">
+                            <template #icon>
+                                <n-icon>
+                                    <DocumentOutline />
+                                </n-icon>
+                            </template>
+                            Gantt X Entregables
+                        </n-button>
+                        <n-button round @click="activeTab = 'Gantt Resumido'" :color="activeTab == 'Gantt Resumido' ? '#ABABAB' : ''">
+                            <template #icon>
+                                <n-icon>
+                                    <DocumentOutline />
+                                </n-icon>
+                            </template>
+                            Gantt X Fase
+                        </n-button>
+                        
+                        <n-button round @click="activeTab = 'Resumen'" :color="activeTab == 'Resumen' ? '#ABABAB' : ''">
+                            <template #icon>
+                                <n-icon>
+                                    <DocumentOutline />
+                                </n-icon>
+                            </template>
+                            Resumen
+                        </n-button>
+                    </n-button-group>
                 </div>
                 <div>
                     <template v-if="projectStore.editable">
-                        <ProjectEditor v-if="activeTab === 'Gestión'" @submit="submit" />
-                        <ProjectDashboard v-if="activeTab === 'Dashboard'" />
-                        <GanttView v-if="activeTab === 'Gantt'" />
+                        <ProjectEditor v-if="activeTab === 'EDT'" @submit="submit" />
+                        <Organigrama v-if="activeTab === 'EDT Organigrama'"/>
+                        <ProjectDashboard v-if="activeTab === 'Tablero de control'" />
+                        <GanttView v-if="activeTab === 'Gantt Extendido'" />
+                        <TimeLine v-if="activeTab === 'Gantt Resumido'" />
+                        <AltGantt v-if="activeTab === 'Gantt Entregables'"/>
                         <ProjectStatus v-if="activeTab === 'Resumen'" :project="projectStore.editable" />
                     </template>
 
@@ -48,25 +98,27 @@
 <script setup lang="ts">
 import PlaceholderPattern from '@/components/PlaceholderPattern.vue';
 
-import { useProjectStore } from '@/composables/useProjectStore';
-import AppLayout from '@/layouts/AppLayout.vue';
-import type { BreadcrumbItem } from '@/types';
-import { Head } from '@inertiajs/vue3';
-import axios from 'axios';
-import { onMounted, ref } from 'vue';
-
 import ProjectDashboard from '@/components/manager.views/dashboard.vue';
 import GanttView from '@/components/manager.views/gantt.vue';
 import ProjectEditor from '@/components/manager.views/gestion.vue';
 import ProjectHeader from '@/components/manager.views/header.vue';
 import ProjectStatus from '@/components/manager.views/status.vue';
-import { usePage } from '@inertiajs/vue3';
+import TimeLine from '@/components/manager.views/TimeLine.vue';
+import Organigrama from '@/components/manager.views/organigrama.vue'
+import AltGantt from '@/components/manager.views/altergantt.vue'
+import { useProjectStore } from '@/composables/useProjectStore';
+import AppLayout from '@/layouts/AppLayout.vue';
+import type { BreadcrumbItem } from '@/types';
+import { Head, usePage } from '@inertiajs/vue3';
+import { DocumentOutline } from '@vicons/ionicons5';
+import axios from 'axios';
+import { onMounted, ref } from 'vue';
 const { props } = usePage();
 const projectId = props.projectId as number;
 const projectStore = useProjectStore();
 
-const tabs = ['Gestión', 'Dashboard', 'Gantt', 'Resumen'];
-const activeTab = ref('Gestión');
+const tabs = ['EDT', 'EDT Organigrama', 'Tablero de control', 'Gantt Extendido', 'Gantt Resumido','Gantt Entregables', 'Resumen'];
+const activeTab = ref('EDT');
 
 const breadcrumbs: BreadcrumbItem[] = [{ title: 'Manager', href: '/manager' }];
 

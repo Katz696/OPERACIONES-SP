@@ -15,6 +15,7 @@ export interface NodeData {
   percentage_progress?:number
   depends_me: string | null
   i_depend: string | null
+  comments: string | null
 }
 
 export interface TreeNode {

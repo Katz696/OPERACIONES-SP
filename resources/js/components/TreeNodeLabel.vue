@@ -1,5 +1,5 @@
 <template>
-    <div class="flex w-full items-start gap-2 text-sm">
+    <div class="flex w-full items-start gap-2 text-sm" :class="{ 'overdue-row': isOverdue }">
         <!-- boton añadir -->
         <n-button :disabled="isActivity" :type="tipoNodoBtmAdd" @click="$emit('add-child')" class="w-6" dashed round size="Small">
             {{ (!isActivity ? '+ ' : '') + tipoNodo }}
@@ -7,7 +7,8 @@
         <!-- index -->
         <span class="w-12">{{ localData.index }}</span>
         <!-- Nombre o tittle-->
-        <n-input
+
+        <!-- <n-input
             v-model:value="localData.title"
             @input="emitChange"
             class="w-48"
@@ -16,7 +17,32 @@
             round
             size="Small"
             :title="localData.title"
+        /> -->
+        <!-- Título (vista previa + modal editable) -->
+        <!-- Título (preview + modal con Quill) -->
+        <n-input
+            :value="titlePreview"
+            placeholder="Título"
+            class="w-48 cursor-pointer"
+            style="width: 190px"
+            round
+            size="Small"
+            readonly
+            :title="localData.title"
+            @click="openTitleEditor"
+            
         />
+
+        <!-- Modal para editar título con Quill -->
+        <n-modal v-model:show="showTitleModal" preset="dialog" title="Editar título">
+            <div style="min-height: 200px">
+                <QuillEditor v-model:content="editorTitle" content-type="html" theme="snow" style="height: 200px" />
+            </div>
+            <template #action>
+                <n-button @click="showTitleModal = false">Cancelar</n-button>
+                <n-button type="primary" @click="saveTitleChanges">Guardar</n-button>
+            </template>
+        </n-modal>
         <!-- relaciones -->
         <n-tree-select
             multiple
@@ -89,7 +115,7 @@
             v-model:value="localData.status_id"
             @update:value="emitChange"
             :options="optionsStatuses"
-            :disabled="!isActivity"
+            :disabled="true"
             style="width: 130px"
             :placeholder="''"
         />
@@ -99,8 +125,8 @@
             v-model:value="localData.substatus_id"
             @update:value="emitChange"
             :options="optionsSubstatuses"
-            :disabled="!isActivity"
-            style="width: 120px"
+            :disabled="!isDelivery"
+            style="width: 200px"
             :placeholder="''"
         />
         <!-- porcentaje -->
@@ -123,22 +149,45 @@
             ><template #suffix>%</template>
         </n-input-number>
         <!-- prioridad -->
-        <n-select
+        <!-- <n-select
             v-model:value="localData.priority_id"
             @update:value="emitChange"
             :options="optionsPriorities"
             style="width: 100px"
             :placeholder="''"
-        />
+        /> -->
         <!-- sprintses -->
-        <n-select
+        <!-- <n-select
             v-model:value="localData.sprint_id"
             @update:value="emitChange"
             :options="optionsSprint"
             :disabled="!isActivity"
             style="width: 100px"
             :placeholder="''"
+        /> -->
+        <!-- Comentarios -->
+        <!-- Comentarios (abre modal con Quill) -->
+        <n-input
+            :value="commentsPreview"
+            placeholder="Comentarios"
+            class="w-48 cursor-pointer"
+            style="width: 190px"
+            round
+            size="Small"
+            readonly
+            @click="openEditor"
         />
+
+        <!-- Modal con Quill -->
+        <n-modal v-model:show="showModal" preset="dialog" title="Editar comentarios">
+            <div style="min-height: 200px">
+                <QuillEditor v-model:content="editorContent" content-type="html" theme="snow" style="height: 200px" />
+            </div>
+            <template #action>
+                <n-button @click="showModal = false">Cancelar</n-button>
+                <n-button type="primary" @click="saveChanges">Guardar</n-button>
+            </template>
+        </n-modal>
         <!-- responsable -->
         <n-select v-model:value="localData.user_id" @update:value="emitChange" :placeholder="''" :options="optionsUsers" style="width: 150px" />
         <!-- Boton eliminar -->
@@ -149,8 +198,9 @@
 <script setup lang="ts">
 import { NodeData } from '@/composables/useNodeInterfaces';
 import { Priority, Sprint, Status, SubStatus, User } from '@/types/treeproject';
+import { QuillEditor } from '@vueup/vue-quill';
+import '@vueup/vue-quill/dist/vue-quill.snow.css';
 import { computed, defineEmits, defineProps, ref, watch } from 'vue';
-
 const props = defineProps<{
     data: NodeData;
     siblings: { label: string; key: string }[];
@@ -223,4 +273,81 @@ const disableWeekends = (ts: any) => {
     // 0 = domingo, 6 = sábado
     return day === 0 || day === 6;
 };
+// --- Quill + Modal ---
+const showModal = ref(false);
+const editorContent = ref(localData.value.comments ?? '');
+
+function openEditor() {
+    editorContent.value = localData.value.comments ?? '';
+    showModal.value = true;
+}
+function saveChanges() {
+    localData.value.comments = editorContent.value;
+    emitChange();
+    showModal.value = false;
+}
+const commentsPreview = computed(() => {
+    if (!localData.value.comments) return '';
+
+    // 1. Quitar etiquetas HTML
+    const plain = localData.value.comments.replace(/<[^>]+>/g, '');
+
+    // 2. Reducir a 30 caracteres + "…" si es largo
+    return plain.length > 30 ? plain.slice(0, 30) + '…' : plain;
+});
+
+// Modal Title
+// --- Quill para Título ---
+const showTitleModal = ref(false);
+const editorTitle = ref(localData.value.title ?? '');
+
+// Abrir editor de título
+function openTitleEditor() {
+    editorTitle.value = localData.value.title ?? '';
+    showTitleModal.value = true;
+}
+
+// Guardar cambios (respetando longitud PHP)
+function saveTitleChanges() {
+    const maxLength = 255; // ajusta al límite de tu columna VARCHAR en PHP
+    const plain = editorTitle.value.replace(/<[^>]+>/g, ''); // texto plano
+
+    if (plain.length > maxLength) {
+        //window.$message?.error?.(`El título no puede exceder ${maxLength} caracteres (actual: ${plain.length}).`);
+        return;
+    }
+
+    localData.value.title = editorTitle.value;
+    emitChange();
+    showTitleModal.value = false;
+}
+
+// Preview corto para la tabla
+const titlePreview = computed(() => {
+    if (!localData.value.title) return '';
+    const plain = localData.value.title.replace(/<[^>]+>/g, '');
+    return plain.length > 30 ? plain.slice(0, 30) + '…' : plain;
+});
+const today = new Date().toISOString().split('T')[0]; // formato YYYY-MM-DD
+
+const isOverdue = computed(() => {
+    if (!localData.value.end_date || localData.value.days ===0) return false;
+    return localData.value.status_id !== 3 && (localData.value.percentage??0) < 100 && localData.value.end_date < today;
+});
 </script>
+<style>
+.overdue-row {
+    background-color: rgba(223, 226, 25, 0.3);
+    /* animation: blink-red 1s infinite; */
+}
+
+@keyframes blink-red {
+    0%,
+    100% {
+        background-color: transparent;
+    }
+    50% {
+        background-color: rgba(223, 226, 25, 0.3);
+    }
+}
+</style>

@@ -31,7 +31,8 @@ class Activity extends Model
         'restriction_start_date',
         'restriction_end_date',
         'depend_me',
-        'i_depend'
+        'i_depend',
+        'slack'
     ];
 
     // Relaciones

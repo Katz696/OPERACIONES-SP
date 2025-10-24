@@ -1,10 +1,12 @@
 <?php
 
+use App\Http\Controllers\AgreementController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
 use App\Http\Controllers\ProjectController;
 use App\Http\Controllers\CatalogsController;
+use App\Http\Controllers\SnapProjectController;
 use Illuminate\Routing\Route as RoutingRoute;
 
 Route::get('/', function () {
@@ -34,6 +36,15 @@ Route::get('catalogs', function () {
 
 Route::get('/project', [ProjectController::class, 'showTree'])->name('projects.show');
 Route::post('/project/update', [ProjectController::class, 'updateTree'])->name('projects.update');
+Route::get('/project/history', [ProjectController::class, 'history'])->name('projects.history');
+Route::get('/project/{id}/snaps', [SnapProjectController::class, 'index'])->name('project.snaps');
+Route::post('/project/snaps', [SnapProjectController::class, 'store'])->name('project.snaps.store');
+Route::delete('/project/snaps/{id}', [SnapProjectController::class, 'destroy'])->name('snaps.destroy');
+
+Route::get('/project/{id}/agreements',[AgreementController::class,'index'])->name('project.agreements');
+Route::post('/project/agreements/store', [AgreementController::class,'store'])->name('project.agreements.store');
+Route::delete('/project/agreement/{id}', [AgreementController::class, 'destroy'])->name('project.agreements.destroy');
+
 
 Route::get('/manager/{id}', function ($id) {
     return Inertia::render('Manager', [

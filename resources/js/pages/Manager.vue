@@ -9,74 +9,29 @@
 
                 <div class="mb-4 flex space-x-4 border-b">
                     <n-button-group size="small">
-                        <n-button round @click="activeTab = 'EDT'" :color="activeTab == 'EDT' ? '#ABABAB' : ''">
+                        <n-button v-for="tab in tabs" :key="tab" round :color="activeTab === tab ? '#ABABAB' : ''" @click="activeTab = tab">
                             <template #icon>
                                 <n-icon>
-                                    <DocumentOutline />
+                                    <component :is="tabIcons[tab]" />
                                 </n-icon>
                             </template>
-                            Cronograma
-                        </n-button>
-                        <n-button round @click="activeTab = 'EDT Organigrama'" :color="activeTab == 'EDT Organigrama' ? '#ABABAB' : ''">
-                            <template #icon>
-                                <n-icon>
-                                    <DocumentOutline />
-                                </n-icon>
-                            </template>
-                            EDT
-                        </n-button>
-                        <n-button round @click="activeTab = 'Tablero de control'" :color="activeTab == 'Tablero de control' ? '#ABABAB' : ''">
-                            <template #icon>
-                                <n-icon>
-                                    <DocumentOutline />
-                                </n-icon>
-                            </template>
-                            Tablero de control
-                        </n-button>
-                        <n-button round @click="activeTab = 'Gantt Extendido'" :color="activeTab == 'Gantt Extendido' ? '#ABABAB' : ''">
-                            <template #icon>
-                                <n-icon>
-                                    <DocumentOutline />
-                                </n-icon>
-                            </template>
-                            Gantt X Tarea
-                        </n-button>
-                        <n-button round @click="activeTab = 'Gantt Entregables'" :color="activeTab == 'Gantt Entregables' ? '#ABABAB' : ''">
-                            <template #icon>
-                                <n-icon>
-                                    <DocumentOutline />
-                                </n-icon>
-                            </template>
-                            Gantt X Entregables
-                        </n-button>
-                        <n-button round @click="activeTab = 'Gantt Resumido'" :color="activeTab == 'Gantt Resumido' ? '#ABABAB' : ''">
-                            <template #icon>
-                                <n-icon>
-                                    <DocumentOutline />
-                                </n-icon>
-                            </template>
-                            Gantt X Fase
-                        </n-button>
-                        
-                        <n-button round @click="activeTab = 'Resumen'" :color="activeTab == 'Resumen' ? '#ABABAB' : ''">
-                            <template #icon>
-                                <n-icon>
-                                    <DocumentOutline />
-                                </n-icon>
-                            </template>
-                            Resumen
+                            {{ tab }}
                         </n-button>
                     </n-button-group>
                 </div>
                 <div>
                     <template v-if="projectStore.editable">
-                        <ProjectEditor v-if="activeTab === 'EDT'" @submit="submit" />
-                        <Organigrama v-if="activeTab === 'EDT Organigrama'"/>
+                        <ProjectEditor v-if="activeTab === 'Cronograma'" @submit="submit" />
+                        <Organigrama v-if="activeTab === 'EDT'" />
                         <ProjectDashboard v-if="activeTab === 'Tablero de control'" />
-                        <GanttView v-if="activeTab === 'Gantt Extendido'" />
-                        <TimeLine v-if="activeTab === 'Gantt Resumido'" />
-                        <AltGantt v-if="activeTab === 'Gantt Entregables'"/>
+                        <GanttView v-if="activeTab === 'Gantt'" />
+                        <TimeLine v-if="activeTab === 'Gantt Fases'" />
+                        <AltGantt v-if="activeTab === 'Gantt Entregables'" />
                         <ProjectStatus v-if="activeTab === 'Resumen'" :project="projectStore.editable" />
+                        <Log v-if="activeTab === 'Log'"/>
+                        <Snap v-if="activeTab === 'Lineas base'"/>
+                        <Matrixdelivery v-if="activeTab === 'Matriz Entregables'"/>
+                        <Agreement v-if="activeTab === 'Acuerdos'"/>
                     </template>
 
                     <template v-else>
@@ -98,27 +53,58 @@
 <script setup lang="ts">
 import PlaceholderPattern from '@/components/PlaceholderPattern.vue';
 
+import AltGantt from '@/components/manager.views/altergantt.vue';
 import ProjectDashboard from '@/components/manager.views/dashboard.vue';
 import GanttView from '@/components/manager.views/gantt.vue';
 import ProjectEditor from '@/components/manager.views/gestion.vue';
 import ProjectHeader from '@/components/manager.views/header.vue';
+import Organigrama from '@/components/manager.views/organigrama.vue';
 import ProjectStatus from '@/components/manager.views/status.vue';
+import Log from '@/components/manager.views/logs.vue';
+import Snap from '@/components/manager.views/snaps.vue';
 import TimeLine from '@/components/manager.views/TimeLine.vue';
-import Organigrama from '@/components/manager.views/organigrama.vue'
-import AltGantt from '@/components/manager.views/altergantt.vue'
 import { useProjectStore } from '@/composables/useProjectStore';
 import AppLayout from '@/layouts/AppLayout.vue';
 import type { BreadcrumbItem } from '@/types';
 import { Head, usePage } from '@inertiajs/vue3';
-import { DocumentOutline } from '@vicons/ionicons5';
+import {
+    BarChartOutline,
+    CalendarOutline,
+    ClipboardOutline,
+    DocumentOutline,
+    GitNetworkOutline,
+    GridOutline,
+    ReaderOutline,
+    ListOutline,
+    FileTrayFullOutline,
+    FolderOpenOutline,
+    NewspaperOutline
+} from '@vicons/ionicons5';
+
 import axios from 'axios';
 import { onMounted, ref } from 'vue';
+import Matrixdelivery from '@/components/manager.views/matrixdelivery.vue';
+import Agreement from '@/components/manager.views/agreement.vue';
 const { props } = usePage();
 const projectId = props.projectId as number;
 const projectStore = useProjectStore();
+const tabIcons: Record<string, any> = {
+    'Cronograma': DocumentOutline,
+    'EDT': GitNetworkOutline,
+    'Tablero de control': GridOutline,
+    'Gantt': CalendarOutline,
+    'Gantt Entregables': ClipboardOutline,
+    'Gantt Fases': ReaderOutline,
+    'Resumen': BarChartOutline,
+    'Matriz Entregables': ListOutline, // icono sugerido
+    'Acuerdos': FileTrayFullOutline,   // icono sugerido
+    'Lineas base': FolderOpenOutline,    // icono sugerido
+    'Log': NewspaperOutline,           // icono sugerido
+};
 
-const tabs = ['EDT', 'EDT Organigrama', 'Tablero de control', 'Gantt Extendido', 'Gantt Resumido','Gantt Entregables', 'Resumen'];
-const activeTab = ref('EDT');
+
+const tabs = ['Cronograma', 'EDT', 'Tablero de control', 'Gantt', 'Gantt Entregables','Gantt Fases', 'Resumen','Matriz Entregables','Acuerdos','Lineas base','Log'];
+const activeTab = ref('Cronograma');
 
 const breadcrumbs: BreadcrumbItem[] = [{ title: 'Manager', href: '/manager' }];
 

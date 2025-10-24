@@ -6,19 +6,6 @@
         </n-button>
         <!-- index -->
         <span class="w-12">{{ localData.index }}</span>
-        <!-- Nombre o tittle-->
-
-        <!-- <n-input
-            v-model:value="localData.title"
-            @input="emitChange"
-            class="w-48"
-            style="width: 190px"
-            placeholder="Nombre"
-            round
-            size="Small"
-            :title="localData.title"
-        /> -->
-        <!-- Título (vista previa + modal editable) -->
         <!-- Título (preview + modal con Quill) -->
         <n-input
             :value="titlePreview"
@@ -30,7 +17,6 @@
             readonly
             :title="localData.title"
             @click="openTitleEditor"
-            
         />
 
         <!-- Modal para editar título con Quill -->
@@ -110,6 +96,68 @@
             :disabled="true"
             size="Small"
         />
+        <!-- holgura -->
+         <n-input-number
+            :show-button="false"
+            type="number"
+            v-model:value="localData.slack"
+            class="w-16"
+            round
+            size="Small"
+            placeholder="0"
+            disabled
+        />
+
+        <!-- Fecha restirccion  -->
+        <n-date-picker
+            :value="
+                localData.restriction_end_date
+                    ? new Date(
+                          Number(localData.restriction_end_date.split('-')[0]),
+                          Number(localData.restriction_end_date.split('-')[1]) - 1,
+                          Number(localData.restriction_end_date.split('-')[2]),
+                      ).getTime()
+                    : null
+            "
+            @update:value="
+                (val: any) => {
+                    localData.restriction_end_date = val ? new Date(val).toISOString().split('T')[0] : null;
+                    emitChange();
+                }
+            "
+            type="date"
+            :is-date-disabled="disableWeekends"
+            style="width: 120px"
+            placeholder="----:--:--"
+            size="Small"
+            :class="
+                (() => {
+                    const r = localData.restriction_end_date ? new Date(localData.restriction_end_date) : null;
+                    const e = localData.end_date ? new Date(localData.end_date) : null;
+                    if (!r || !e) return ''; // si alguno es null, sin clase especial
+                    return r < e ? 'warning-date' : 'success-date';
+                })()
+            "
+        />
+        <!-- desfase -->
+        <n-input-number
+            :show-button="false"
+            type="number"
+            v-model:value="daysDifference"
+            class="w-16"
+            round
+            size="Small"
+            placeholder=""
+            style="color: red"
+            :class="
+                (() => {
+                    const r = localData.restriction_end_date ? new Date(localData.restriction_end_date) : null;
+                    const e = localData.end_date ? new Date(localData.end_date) : null;
+                    if (!r || !e) return ''; // si alguno es null, sin clase especial
+                    return r < e ? 'warning-date' : 'success-date';
+                })()
+            "
+        />
         <!-- estado -->
         <n-select
             v-model:value="localData.status_id"
@@ -179,9 +227,9 @@
         />
 
         <!-- Modal con Quill -->
-        <n-modal v-model:show="showModal" preset="dialog" title="Editar comentarios">
+        <n-modal v-model:show="showModal" preset="dialog" title="Editar comentarios" style="width: 800px; max-width: 90vw; height: 500px;">
             <div style="min-height: 200px">
-                <QuillEditor v-model:content="editorContent" content-type="html" theme="snow" style="height: 200px" />
+                <QuillEditor v-model:content="editorContent" content-type="html" theme="snow" style="height: 300px;" />
             </div>
             <template #action>
                 <n-button @click="showModal = false">Cancelar</n-button>
@@ -331,8 +379,31 @@ const titlePreview = computed(() => {
 const today = new Date().toISOString().split('T')[0]; // formato YYYY-MM-DD
 
 const isOverdue = computed(() => {
-    if (!localData.value.end_date || localData.value.days ===0) return false;
-    return localData.value.status_id !== 3 && (localData.value.percentage??0) < 100 && localData.value.end_date < today;
+    if (!localData.value.end_date || localData.value.days === 0) return false;
+    return localData.value.status_id !== 3 && (localData.value.percentage ?? 0) < 100 && localData.value.end_date < today;
+});
+function parseLocalDate(dateStr: string): Date {
+    const [year, month, day] = dateStr.split('-').map(Number);
+    return new Date(year, month - 1, day); // mes empieza desde 0
+}
+const daysDifference = computed(() => {
+    if (localData.value.restriction_end_date != null && localData.value.end_date) {
+        const restric = parseLocalDate(localData.value.restriction_end_date);
+        const end = parseLocalDate(localData.value.end_date);
+
+        const min = restric >= end ? end : restric;
+        const max = min === restric ? end : restric;
+        let init = 0;
+        while (min < max) {
+            if (min.getDay() !== 0 && min.getDay() !== 6) {
+                init++;
+            }
+            min.setDate(min.getDate() + 1);
+        }
+        return init;
+    }
+
+    return null;
 });
 </script>
 <style>
@@ -349,5 +420,21 @@ const isOverdue = computed(() => {
     50% {
         background-color: rgba(223, 226, 25, 0.3);
     }
+}
+.warning-date .n-date-picker,
+.warning-date .n-input {
+    border: 1px solid #ff1500 !important;
+    background-color: #f9deb2 !important;
+}
+
+.success-date .n-date-picker,
+.success-date .n-input {
+    border: 1px solid #10f518 !important;
+    background-color: #81f78b !important;
+}
+.n-date-picker--disabled .n-date-picker,
+.success-date .n-input {
+    border: 1px solid #10f518 !important;
+    background-color: #81f78b !important;
 }
 </style>

@@ -19,7 +19,7 @@
             </div>
 
             <!-- Filtro Estado -->
-            <div class="flex flex-col gfap-4">
+            <div class="gfap-4 flex flex-col">
                 <label for="filter-status" class="mb-1 text-xs font-semibold text-gray-600"> Filtrar por estado </label>
                 <n-select
                     id="filter-status"
@@ -40,14 +40,15 @@
 
         <!-- Encabezados -->
         <div
-            class="grid grid-cols-[40px_200px_200px_200px_100px_80px_80px_120px_120px_80px_80px] gap-2 rounded bg-gray-100 p-2 text-xs font-semibold text-gray-700"
+            class="grid grid-cols-[40px_200px_200px_200px_100px_200px_200px_120px_120px_80px_80px] gap-2 rounded bg-gray-100 p-2 text-xs font-semibold text-gray-700"
         >
             <div>#</div>
             <div>Título</div>
             <div>Cliente</div>
             <div>Responsable</div>
             <div>Estado</div>
-            <div>%</div>
+            <div>Avance Real</div>
+            <div>Avance planeado</div>
             <div>Días</div>
             <div>Inicio</div>
             <div>Fin</div>
@@ -59,7 +60,7 @@
         <div
             v-for="(p, index) in filteredProjects"
             :key="p.id ?? `new-${index}`"
-            class="grid grid-cols-[40px_200px_200px_200px_100px_80px_80px_120px_120px_80px_80px] items-center gap-2 border-b bg-white p-2 text-sm transition hover:bg-gray-50"
+            class="grid grid-cols-[40px_200px_200px_200px_100px_200px_200px_120px_120px_80px_80px] items-center gap-2 border-b bg-white p-2 text-sm transition hover:bg-gray-50"
         >
             <div>{{ index + 1 }}</div>
 
@@ -70,9 +71,21 @@
             <n-select v-model:value="p.user_id" :options="usersOptions" filterable placeholder="Selecciona un usuario" />
 
             <span class="status-badge">{{ p.status.status }}</span>
-            <span class="status-badge">{{ p.percentage }}</span>
+            <n-progress
+                type="line"
+                indicator-placement="inside"
+                :color="p.percentage < p.percentage_planned ? themeVars.errorColor : themeVars.successColor"
+                :rail-color="changeColor(p.percentage < p.percentage_planned ? themeVars.errorColor : themeVars.successColor, { alpha: 0.2 })"
+                :percentage="Math.round(p.percentage)"
+            />
+            <n-progress
+                type="line"
+                indicator-placement="inside"
+                :color="themeVars.infoColor"
+                :rail-color="changeColor(themeVars.infoColor, { alpha: 0.2 })"
+                :percentage="Math.round(p.percentage_planned)"
+            />
             <span class="status-badge">{{ p.days }}</span>
-
             <n-date-picker
                 :value="
                     p.start_date
@@ -120,7 +133,11 @@
 import { useCustomersStore, useProjectStore, useUserStore } from '@/composables/useCatalogStore';
 import type { Customer, User } from '@/types/catalogs';
 import axios from 'axios';
+import { useThemeVars } from 'naive-ui';
+import { changeColor } from 'seemly';
 import { computed, ref, watch } from 'vue';
+
+const themeVars = useThemeVars();
 
 const store = useProjectStore();
 const storeUsers = useUserStore();

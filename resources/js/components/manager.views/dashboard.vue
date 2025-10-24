@@ -1,13 +1,34 @@
 <template>
-    <div class="space-y-6 p-6">
-        <!-- 📊 KPIs principales -->
-        <n-grid :cols="4" :x-gap="16" :y-gap="16">
-            <n-gi><n-card size="small">Avance Global</n-card></n-gi>
-            <n-gi><n-card size="small">Duración (días)</n-card></n-gi>
-            <n-gi><n-card size="small">Entregables</n-card></n-gi>
-            <n-gi><n-card size="small">Actividades</n-card></n-gi>
+    <div class="min-h-screen space-y-6 bg-gray-50 p-6">
+        <!-- 📊 KPIs principales + Gauge -->
+        <n-grid :cols="3" :x-gap="16" :y-gap="16" class="h-full">
+            <!-- KPI Cards -->
+            <n-gi :span="2" class="h-full">
+                <n-grid :cols="3" :x-gap="16" :y-gap="16" class="h-full">
+                    <n-gi v-for="(kpi, i) in kpis" :key="i" class="h-full">
+                        <Counter :title="kpi.label" :counter="kpi.value" />
+                    </n-gi>
+                </n-grid>
+            </n-gi>
+
+            <!-- Gauge -->
+            <n-gi :span="1" class="flex h-full items-center justify-center">
+                <n-card
+                    size="small"
+                    title="Índice de Desempeño del Cronograma"
+                    class="flex h-full w-full items-center justify-center rounded-xl bg-white p-6 shadow-lg"
+                >
+                    <GaugeProject :value="valueSPI" />
+                </n-card>
+            </n-gi>
         </n-grid>
-        <n-card title="Indicador de Avance por Fase" size="small">
+
+        <!-- Indicador de Avance por Fase -->
+        <n-card
+            title="Indicador de Avance por Fase"
+            size="small"
+            class="flex h-full w-full items-center justify-center rounded-xl bg-white shadow-lg"
+        >
             <n-grid :cols="project.phases.length" :x-gap="16" :y-gap="16">
                 <n-gi v-for="(phase, index) in project.phases" :key="index">
                     <GaugePhase
@@ -20,124 +41,126 @@
                 </n-gi>
             </n-grid>
         </n-card>
-        <!-- 📊 Avance por Fase (Planeado vs Real) -->
-        <n-card title="Avance por Fase (Planeado vs Real)" size="small">
-            <div class="-mx-2 flex flex-wrap">
-                <div v-for="(phase, i) in project.phases" :key="i" class="mb-4 flex w-full flex-col items-center px-2 sm:w-1/2 md:w-1/3 lg:w-1/4">
-                    <n-progress
-                        type="multiple-circle"
-                        :percentage="[Math.round(Number(phase.data.percentage ?? 0)), Math.round(Number(phase.data.percentage_planned ?? 0))]"
-                        :color="['#10b981', '#3b82f6']"
-                        :stroke-width="12"
-                        :indicator-placement="'inside'"
-                        status="success"
-                    />
 
-                    <span class="mt-2 text-center text-sm">
-                        {{ phase.data.title.replace(/<[^>]*>/g, '') }}
-                    </span>
-                </div>
-            </div>
+        <!-- Gráficos comparativos -->
+        <n-grid :cols="2" :x-gap="16" :y-gap="16" class="h-full">
+            <n-gi class="h-full">
+                <n-card title="Avance por Fase" size="small" class="flex h-full flex-col rounded-xl bg-white p-4 shadow-lg">
+                    <PhasePerformanceChart :phases="project.phases" class="flex-1" />
+                </n-card>
+            </n-gi>
+
+            <n-gi class="h-full">
+                <n-card
+                    title="Distribución de Estados de Entregables"
+                    size="small"
+                    class="flex h-full flex-col items-center justify-center rounded-xl bg-white p-4 shadow-lg"
+                >
+                    <DeliveriesStatusChart :deliveries="allDeliveries" class="flex-1" />
+                </n-card>
+            </n-gi>
+        </n-grid>
+        <n-card size="small" class="flex h-full w-full items-center justify-center rounded-xl bg-white shadow-lg">
+            <BurndownChart :labels="daysLabels" :plannedData="plannedData" :actualData="actual" />
         </n-card>
-
-        <!-- 📈 Gráficos comparativos (2 columnas) -->
-        <n-grid :cols="2" :x-gap="16" :y-gap="16">
-            <n-gi>
-                <n-card title="Avance por Fase" size="small">
-                    <PhasePerformanceChart :phases="project.phases" />
-                </n-card>
-            </n-gi>
-            <n-gi>
-                <n-card title="Distribución de Estados de Entregables" size="small">
-                    <DeliveriesStatusChart :deliveries="allDeliveries" />
-                </n-card>
-            </n-gi>
-        </n-grid>
-        <n-grid :cols="2" :x-gap="16" :y-gap="16">
-            <n-gi>
-                <n-card v-for="(phase, i) in project.phases" :key="i" :title="phase.data.title.replace(/<[^>]*>/g, '')" size="small" class="mb-4">
-                    <div class="flex flex-col gap-2">
-                        <!-- Real -->
-                        <n-progress
-                            type="line"
-                            indicator-placement="inside"
-                            :color="themeVars.errorColor"
-                            :rail-color="changeColor(themeVars.errorColor, { alpha: 0.2 })"
-                            :percentage="Number(phase.data.percentage ?? 0)"
-                            :indicator-text-color="themeVars.errorColor"
-                        />
-
-                        <!-- Planeado -->
-                        <n-progress
-                            type="line"
-                            indicator-placement="inside"
-                            :color="themeVars.warningColor"
-                            :rail-color="changeColor(themeVars.warningColor, { alpha: 0.2 })"
-                            :percentage="Number(phase.data.percentage_planned ?? 0)"
-                            :indicator-text-color="themeVars.warningColor"
-                        />
-                    </div>
-                </n-card>
-            </n-gi>
-            <n-gi>
-                <n-card title="Distribución de Estados de Entregables" size="small">
-                    <DeliveriesStatusChart :deliveries="allDeliveries" />
-                </n-card>
-            </n-gi>
-        </n-grid>
-        <!-- 📉 Tendencia temporal -->
-        <!-- <n-card title="Tendencia de Cumplimiento" size="small" class="flex h-[300px] items-center justify-center">
-            <n-grid :cols="1" :x-gap="16" :y-gap="16">
-                <n-gi>
-                    <TrendChart
-                        :phases="
-                            project.phases.map((p) => ({
-                                title: p.data.title,
-                                percentage: p.data.percentage,
-                                percentage_planned: p.data.percentage_planned,
-                            }))
-                        "
-                    />
-                </n-gi>
-            </n-grid>
-        </n-card> -->
-
-        <!-- 🧱 Gantt Chart -->
-        <!-- <n-card title="Gantt de Entregables" size="small" class="flex h-[400px] items-center justify-center">
-            <span class="text-gray-400">[Gantt Chart]</span>
-        </n-card> -->
-
-        <!-- ⏰ Hitos próximos -->
-        <!-- <n-card title="Próximos Hitos / Tareas Críticas" size="small" class="h-[250px] overflow-y-auto">
-            <ul class="text-gray-600">
-                <li>[Hito 1]</li>
-                <li>[Hito 2]</li>
-                <li>[Hito 3]</li>
-            </ul>
-        </n-card> -->
     </div>
 </template>
+
 <script setup lang="ts">
+import BurndownChart from '@/components/manager.views/charts.chartjs/BurnDownChart.vue';
+import Counter from '@/components/manager.views/charts.chartjs/counter-card.vue';
 import DeliveriesStatusChart from '@/components/manager.views/charts.chartjs/DeliveriesStatusChart.vue';
 import GaugePhase from '@/components/manager.views/charts.chartjs/GaugePhase.vue';
+import GaugeProject from '@/components/manager.views/charts.chartjs/GaugeProject.vue';
 import PhasePerformanceChart from '@/components/manager.views/charts.chartjs/PhasePerformanceChart.vue';
-import TrendChart from '@/components/manager.views/charts.chartjs/TrendChart.vue';
 import { useProjectStore } from '@/composables/useProjectStore';
+import { useThemeVars } from 'naive-ui';
 import { computed } from 'vue';
-import { useThemeVars } from 'naive-ui'
-import { changeColor } from 'seemly'
 
-const themeVars = useThemeVars()
+const actual = [100,92,95,90,91,90,56];
+
+const themeVars = useThemeVars();
 const store = useProjectStore();
 const project = store.editable.project;
+
 const allDeliveries = computed(() => project.phases.flatMap((phase) => phase.deliveries ?? []));
+
+const valueSPI = computed(() => {
+    if (project.data.percentage_planned > 0) {
+        return Math.round((Math.round(project.data.percentage) / Math.round(project.data.percentage_planned)) * 100);
+    }
+    return 0;
+});
+
+// KPI cards dinámicos
+const kpis = computed(() => {
+    const deliveries = project.phases.flatMap((phase) => phase.deliveries);
+
+    const total = deliveries.length;
+
+    const completados = deliveries.filter((d) => d.data.status_id === 3).length;
+    const enProceso = deliveries.filter((d) => d.data.status_id === 2).length;
+    const noIniciados = deliveries.filter((d) => d.data.status_id === 1).length;
+
+    const hoy = new Date();
+
+    // Entregables en proceso y NO vencidos
+    const enProcesoNoVencidos = deliveries.filter((d) => {
+        if (d.data.status_id !== 2) return false;
+        const endDate = new Date(d.data.end_date);
+        return endDate >= hoy; // todavía no venció
+    }).length;
+
+    // Entregables vencidos (en proceso o no completados con fecha pasada)
+    const vencidos = deliveries.filter((d) => {
+        const endDate = new Date(d.data.end_date);
+        return (
+            d.data.status_id !== 3 && // no completado
+            endDate < hoy // fecha vencida
+        );
+    }).length;
+
+    return [
+        { label: 'Total de Entregables', value: total },
+        { label: 'Entregables Completados', value: completados },
+        { label: 'Entregables En Proceso', value: enProceso },
+        { label: 'Entregables No Vencidos', value: enProcesoNoVencidos },
+        { label: 'Entregables Vencidos', value: vencidos },
+        { label: 'Entregables No Iniciados', value: noIniciados },
+    ];
+});
+const daysLabels = computed(() => {
+  const start = new Date(project.data.start_date);
+  const totalDays = project.data.days ?? 7; // días hábiles del proyecto
+  const labels: string[] = [];
+  let currentDate = new Date(start);
+
+  while (labels.length < totalDays) {
+    const day = currentDate.getDay(); // 0 = domingo, 6 = sábado
+    if (day !== 0 && day !== 6) { // solo lunes-viernes
+      labels.push(currentDate.toLocaleDateString());
+    }
+    currentDate.setDate(currentDate.getDate() + 1);
+  }
+
+  return labels;
+});
+
+
+const plannedData = computed(() => {
+  const totalDays = daysLabels.value.length;
+  const totalWork = 100; // porcentaje total de trabajo
+  return Array.from({ length: totalDays }, (_, i) =>
+    Math.round(totalWork - (totalWork / (totalDays - 1)) * i)
+  );
+});
+
 </script>
 
 <style scoped>
-.p-6 {
-    padding: 1.5rem;
-}
-.space-y-6 > * + * {
-    margin-top: 1.5rem;
+/* Si quieres que todo tenga altura mínima consistente */
+.n-card {
+    min-height: 120px;
+    border-radius: 40px;
 }
 </style>

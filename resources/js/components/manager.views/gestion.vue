@@ -1,44 +1,73 @@
 <template>
-  <div class="overflow-x-auto">
-    <!-- Cabecera -->
-    <div class="flex items-start gap-2 pl-4 text-sm font-semibold min-w-max">
-      <div class="w-14">Tipo</div>
-      <div class="w-16">EDT</div>
-      <div class="w-48">Titulo</div>
-      <div class="w-30">Predecesor</div>
-      <div class="w-14">Días</div>
-      <div class="w-30">Fecha inicio</div>
-      <div class="w-30">Fecha fin</div>
-      <div class="w-33">Estado</div>
-      <div class="w-50">Sub Estado</div>
-      <div class="w-15">%AR</div>
-      <div class="w-14">%AP</div>
-      <!-- <div class="w-25">Prioridad</div>
-      <div class="w-25">Sprint</div> -->
-      <div class="w-47">Comentarios</div>
-      <div class="w-30">Responsable</div>
-      <div class="w-15">Eliminar</div>
+    <div class="w-full">
+        <!-- 🔍 Barra de filtros -->
+        <n-card size="small" class="filter-bar" :bordered="false">
+            <n-space align="center" justify="space-between" wrap>
+                <n-space align="center" wrap>
+                    <label for="">Tipo:</label>
+                    <n-select
+                        v-model:value="filters.type"
+                        :options="filterOptions.type"
+                        placeholder="Tipo de nodo"
+                        clearable
+                        size="small"
+                        style="width: 160px"
+                    />
+                    <label for="">Estados:</label>
+                    <n-select
+                        v-model:value="filters.status"
+                        :options="filterOptions.status"
+                        placeholder="Estado"
+                        clearable
+                        size="small"
+                        style="width: 160px"
+                    />
+                    <label for="">Vencidos:</label>
+                    <n-switch v-model:value="filters.overdueOnly">Solo vencidos</n-switch>
+                    <label for="">Ruta Critica:</label>
+                    <n-switch v-model:value="filters.criticalPathOnly" />
+                    <n-button @click="resetFilters" size="small" secondary>Limpiar</n-button>
+                </n-space>
+            </n-space>
+        </n-card>
+        <n-card size="small" class="filter-bar w-full" :bordered="false">
+            <n-space align="center" justify="space-between" wrap>
+                <n-space align="center" wrap>
+                    <div class="w-14">Tipo</div>
+                    <div class="w-16">EDT</div>
+                    <div class="w-45">Titulo</div>
+                    <div class="w-30">Predecesor</div>
+                    <div class="w-12">Días</div>
+                    <div class="w-30">Fecha inicio</div>
+                    <div class="w-28">Fecha fin</div>
+                    <div class="w-18">holgura</div>
+                    <div class="w-28">Fecha restriccón</div>
+                    <div class="w-16">Desfase</div>
+                    <div class="w-32">Estado</div>
+                    <div class="w-50">Sub Estado</div>
+                    <div class="w-15">%AR</div>
+                    <div class="w-14">%AP</div>
+                    <!-- <div class="w-25">Prioridad</div>
+            <div class="w-25">Sprint</div> -->
+                    <div class="w-47">Comentarios</div>
+                    <div class="w-30">Responsable</div>
+                    <div class="w-15">Eliminar</div>
+                </n-space>
+            </n-space>
+        </n-card>
+        <!-- Contenido -->
+        <div class="min-w-max">
+            <n-tree :data="filteredTreeData" :render-label="renderLabel" :default-expand-all="true" show-line :indent="18" />
+        </div>
     </div>
-
-    <!-- Contenido -->
-    <div class="min-w-max">
-      <n-tree
-        :data="treeData"
-        :render-label="renderLabel"
-        :default-expand-all="true"
-        show-line
-        :indent="18"
-      />
-    </div>
-  </div>
 </template>
 
 <script setup lang="ts">
 import TreeNodeLabel from '@/components/TreeNodeLabel.vue';
+import { filtedt } from '@/composables/useFilters';
 import { useProjectStore } from '@/composables/useProjectStore';
 import { NTree } from 'naive-ui';
 import { computed, defineEmits, h, ref, watch } from 'vue';
-
 const emit = defineEmits(['submit']);
 const store = useProjectStore();
 const sprints = computed(() => store.sprints);
@@ -48,7 +77,66 @@ const priorities = computed(() => store.priorities);
 const users = computed(() => store.users);
 
 const treeData = ref<any[]>([]);
+const filters = filtedt;
 
+// --- Opciones del selector ---
+const filterOptions = {
+    type: [
+        { label: 'Proyectos', value: 'project' },
+        { label: 'Fases', value: 'phase' },
+        { label: 'Entregables', value: 'delivery' },
+        { label: 'Actividades', value: 'activity' },
+    ],
+    status: [
+        { label: 'No Iniciado', value: 1 },
+        { label: 'En progreso', value: 2 },
+        { label: 'Completado', value: 3 },
+    ],
+};
+
+function resetFilters() {
+    filters.value = { type: null, status: null, overdueOnly: false, criticalPathOnly: false };
+}
+
+// --- Función para saber si un nodo está vencido ---
+function isNodeOverdue(node: any): boolean {
+    if (!node.data.end_date || node.data.days === 0) return false;
+    const today = new Date().toISOString().split('T')[0];
+    return node.data.status_id !== 3 && (node.data.percentage ?? 0) < 100 && node.data.end_date < today;
+}
+
+// --- Función recursiva que aplica los filtros combinados ---
+function filterTree(nodes: any[]): any[] {
+    return nodes
+        .map((node) => {
+            const matchType =
+                !filters.value.type ||
+                (filters.value.type === 'project' && node.key.startsWith('project-')) ||
+                (filters.value.type === 'phase' && node.key.startsWith('phase-')) ||
+                (filters.value.type === 'delivery' && node.key.startsWith('delivery-')) ||
+                (filters.value.type === 'activity' && node.key.startsWith('activity-'));
+
+            const matchStatus = !filters.value.status || node.data.status_id === filters.value.status;
+
+            const matchOverdue = !filters.value.overdueOnly || (filters.value.overdueOnly && isNodeOverdue(node));
+
+            // Recursividad
+            const matchCriticalPath = !filters.value.criticalPathOnly || (filters.value.criticalPathOnly && node.data.slack === 0);
+
+            // Recursividad
+            const filteredChildren = node.children ? filterTree(node.children) : [];
+
+            // Mostrar si cumple los filtros o si un hijo los cumple
+            if ((matchType && matchStatus && matchOverdue && matchCriticalPath) || filteredChildren.length > 0) {
+                return { ...node, children: filteredChildren };
+            }
+            return null;
+        })
+        .filter(Boolean);
+}
+
+// --- Computed que reacciona automáticamente ---
+const filteredTreeData = computed(() => filterTree(treeData.value));
 watch(
     () => store.editable,
     (newVal) => {
@@ -103,6 +191,7 @@ function onEdit() {
 }
 function applyProcessToProject() {
     propagateDatesTopDown(treeData.value);
+    calculateSlackWithTree(treeData.value);
     sortTreeByEndDate(treeData.value);
     //globalSort();
     recalculateEdt(treeData.value);
@@ -110,10 +199,70 @@ function applyProcessToProject() {
     calculatePercentPlannedBottomUp(treeData.value);
     calculatePercentCompletedBottomUp(treeData.value);
     forceRefreshTree();
-} 
+    console.log(treeData.value)
+}
 // 🔁 Reemplaza por una nueva copia para reactividad
 function forceRefreshTree() {
     treeData.value = JSON.parse(JSON.stringify(treeData.value));
+}
+// dias de holgura
+interface TreeNode {
+    key: string;
+    data: any;
+    children?: TreeNode[];
+}
+function calculateSlackWithTree(treeData: TreeNode[]) {
+    if (!treeData?.length) return;
+    const projectNode = treeData[0];
+    const projectEnd = projectNode.data.end_date;
+
+    // 🔹 Recorrer Fases
+    projectNode.children?.forEach((phase) => {
+        const successors = projectNode.children?.filter(p => p.data.i_depend?.includes(phase.data.id)) ?? [];
+
+        // Referencia de fase: sucesor más temprano o fin del proyecto
+        const phaseRefEnd = successors.length > 0 ? new Date(Math.min(...successors.map((s) => parseLocalDate(s.data.start_date).getTime()))) : parseLocalDate(projectEnd);
+
+        phase.data.slack = Math.max(getWorkingDaysSlack(phase.data.start_date,phaseRefEnd) - phase.data.days,0);
+        // 🔹 Recorrer Entregables
+        phase.children?.forEach((delivery) => {
+            const deliverySuccessors = phase.children?.filter((e)=> e.data.i_depend?.includes(delivery.data.id)) ?? [];
+
+            const deliveryRefEnd =
+                deliverySuccessors.length > 0
+                    ? new Date(Math.min(...deliverySuccessors.map((s) => parseLocalDate(s.data.start_date).getTime())))
+                    : phaseRefEnd;
+
+            delivery.data.slack = Math.max(getWorkingDaysSlack(delivery.data.start_date,deliveryRefEnd) - delivery.data.days,0);
+
+            // 🔹 Recorrer Actividades
+            delivery.children?.forEach((activity) => {
+                const activitySuccessors = delivery.children?.filter(d=>d.data.i_depend?.includes(activity.data.id)) ?? [];
+
+                const activityRefEnd =
+                    activitySuccessors.length > 0
+                        ? new Date(Math.min(...activitySuccessors.map((s) => parseLocalDate(s.data.start_date).getTime())))
+                        : deliveryRefEnd;
+                activity.data.slack = Math.max(getWorkingDaysSlack(activity.data.start_date,activityRefEnd) - activity.data.days,0);
+            });
+        });
+    });
+
+    return treeData;
+}
+function getWorkingDaysSlack(start: string, end: Date): number {
+    let count = 0;
+    const current = parseLocalDate(start);
+    const limit = new Date(end);
+    limit.setHours(0, 0, 0, 0);
+
+    // ⛔️ Excluye el día final (no cuenta el end_date como día libre)
+    while (current < limit) {
+        const day = current.getDay();
+        if (day !== 0 && day !== 6) count++;
+        current.setDate(current.getDate() + 1);
+    }
+    return count;
 }
 //calcular estados
 function updateStatusAndProgress(nodes: any[]): void {
@@ -177,39 +326,6 @@ function getTodayLocalDate(): Date {
     const now = new Date();
     return new Date(now.getFullYear(), now.getMonth(), now.getDate()); // sin hora
 }
-// function calculatePercentPlannedBottomUp(nodes: any[], today: Date = new Date()): void {
-//     today = getTodayLocalDate(); // corregir zona horaria
-//     nodes.forEach((node) => {
-//         if (node.children?.length) {
-//             let totalDays = 0;
-//             let weightedSum = 0;
-
-//             node.children.forEach((child: { data: { days: number; percentage_planned: number } }) => {
-//                 calculatePercentPlannedBottomUp([child], today);
-//                 const childDays = child.data.days || 0;
-//                 const childPlanned = child.data.percentage_planned || 0;
-
-//                 weightedSum += childPlanned * childDays;
-//                 totalDays += childDays;
-//             });
-
-//             node.data.percentage_planned = totalDays > 0 ? +(weightedSum / totalDays).toFixed(2) : 0;
-//         } else {
-//             // nodo hoja: calcular días transcurridos desde start_date
-//             const startStr = node.data.start_date;
-//             const totalDays = node.data.days || 0;
-
-//             if (startStr && totalDays > 0) {
-//                 const start = new Date(startStr);
-//                 const passed = getWorkingDaysBetween(start, today);
-//                 const capped = Math.min(passed, totalDays);
-//                 node.data.percentage_planned = +((100 * capped) / totalDays).toFixed(2);
-//             } else {
-//                 node.data.percentage_planned = 0;
-//             }
-//         }
-//     });
-// }
 function calculatePercentPlannedBottomUp(nodes: any[], today: Date = new Date()): void {
     today = getTodayLocalDate(); // corregir zona horaria
     nodes.forEach((node) => {
@@ -239,8 +355,7 @@ function calculatePercentPlannedBottomUp(nodes: any[], today: Date = new Date())
             const totalDays = node.data.days || 0;
 
             if (startStr && totalDays > 0) {
-                const start = new Date(startStr);
-                const passed = getWorkingDaysBetween(start, today);
+                const passed = getWorkingDaysBetween(startStr, today);
                 const capped = Math.min(passed, totalDays);
                 node.data.percentage_planned = +((100 * capped) / totalDays).toFixed(2);
             } else {
@@ -250,9 +365,9 @@ function calculatePercentPlannedBottomUp(nodes: any[], today: Date = new Date())
     });
 }
 
-function getWorkingDaysBetween(start: Date, end: Date): number {
+function getWorkingDaysBetween(start: string, end: Date): number {
     let count = 0;
-    const current = new Date(start);
+    const current = parseLocalDate(start);
 
     while (current <= end) {
         const day = current.getDay();
@@ -263,6 +378,7 @@ function getWorkingDaysBetween(start: Date, end: Date): number {
 
     return count;
 }
+
 function parseLocalDate(dateStr: string): Date {
     const [year, month, day] = dateStr.split('-').map(Number);
     return new Date(year, month - 1, day); // mes empieza desde 0
@@ -328,7 +444,7 @@ function propagateDatesTopDown(nodes: any[], parentStartDate: string | null = nu
             data.start_date = fixInitLaboralDay(suggestInitDate, 0);
             if (data.start_date && !isNaN(data.days)) {
                 const end = calculateRangeLaboralDays(data.days, data.start_date);
-                data.end_date = end.toISOString().split("T")[0];
+                data.end_date = end.toISOString().split('T')[0];
             }
         }
 
@@ -337,9 +453,7 @@ function propagateDatesTopDown(nodes: any[], parentStartDate: string | null = nu
             propagateDatesTopDown(node.children, data.start_date);
 
             // --- Ajustamos fechas del padre en base a los hijos ---
-            const validChildren = node.children.filter(
-                (c: any) => c.data.days > 0
-            );
+            const validChildren = node.children.filter((c: any) => c.data.days > 0);
 
             if (validChildren.length > 0) {
                 const mindate = validChildren.reduce((nx: any, na: any) => {
@@ -370,55 +484,6 @@ function propagateDatesTopDown(nodes: any[], parentStartDate: string | null = nu
     });
 }
 
-
-// function propagateDatesTopDown(nodes: any[], parentStartDate: string | null = null) {
-//     nodes.forEach((node) => {
-//         const data = node.data;
-//         if (node.children?.length) {
-//             propagateDatesTopDown(node.children, data.start_date);
-//             const mindate = node.children.reduce((nx: any, na: any) => {
-//                 const min = new Date(nx.data.start_date);
-//                 const actual = new Date(na.data.start_date);
-//                 return min > actual ? na : nx;
-//             });
-//             const maxdate = node.children.reduce((nx: any, na: any) => {
-//                 const max = new Date(nx.data.end_date);
-//                 const actual = new Date(na.data.end_date);
-//                 return max < actual ? na : nx;
-//             });
-//             data.days = calculateDurationDays(mindate.data.start_date,maxdate.data.end_date);
-//             data.end_date = maxdate.data.end_date;
-//         } else {
-//             let parentNode = null;
-//             if (data.i_depend !== null && Array.isArray(data.i_depend) && data.i_depend.length > 0) {
-//                 const iDepOfThese = nodes.filter((n) => data.i_depend.includes(n.data.id));
-
-//                 parentNode = iDepOfThese.reduce((nx, na) => {
-//                     const maxFutureDate = new Date(nx.data.end_date);
-//                     const actualFutureDate = new Date(na.data.end_date);
-//                     return actualFutureDate > maxFutureDate ? na : nx;
-//                 });
-//             }
-
-//             let suggestInitDate = parentStartDate;
-
-//             if (data.start_date && !parentStartDate) {
-//                 suggestInitDate = fixInitLaboralDay(data.start_date, 0);
-//             }
-
-//             if (parentNode && parentNode.data.end_date) {
-//                 suggestInitDate = fixInitLaboralDay(parentNode.data.end_date, 1);
-//             }
-
-//             data.start_date = suggestInitDate;
-
-//             if (data.start_date && !isNaN(data.days)) {
-//                 const end = calculateRangeLaboralDays(data.days, data.start_date);
-//                 data.end_date = end.toISOString().split('T')[0];
-//             }
-//         }
-//     });
-// }
 // 🔁 Reconstruye desde el árbol
 function reconstructProjectFromTree(treeNodes: any[]) {
     const root = treeNodes[0];
@@ -450,16 +515,66 @@ function addChild(node: any) {
                 user_id: null,
                 title: 'Ingrese el titulo de la fase',
                 index: 0,
-                days: 0,
+                days: 1,
                 percentage: 0,
                 percentage_planned: 0,
                 percentage_progress: 0,
                 start_date: suggestedStart,
                 end_date: suggestedStart,
+                restriction_end_date: null,
                 depends_me: null,
                 i_depend: null,
             },
-            children: [],
+            children: [
+                {
+                    key: `delivery-`,
+                    data: {
+                        id: null,
+                        project_id: store.editable?.project.data.id,
+                        phase_id: null,
+                        status_id: 1,
+                        substatus_id: 1,
+                        priority_id: 1,
+                        user_id: null,
+                        sprint_id: 1,
+                        index: 0,
+                        title: 'Ingrese el titulo del entregable',
+                        days: 1,
+                        percentage: 0,
+                        percentage_planned: 0,
+                        percentage_progress: 0,
+                        start_date: suggestedStart,
+                        end_date: suggestedStart,
+                        restriction_end_date: null,
+                        depends_me: null,
+                        i_depend: null,
+                    },
+                    children: [
+                        {
+                            key: `activity-`,
+                            data: {
+                                id: null,
+                                delivery_id: null,
+                                status_id: 1,
+                                substatus_id: null,
+                                priority_id: 1,
+                                user_id: null,
+                                index: node.children.length,
+                                title: 'Ingrese el titulo de la actividad',
+                                percentage: 0,
+                                percentage_planned: 0,
+                                percentage_progress: 0,
+                                days: 1,
+                                start_date: suggestedStart,
+                                end_date: suggestedStart,
+                                restriction_end_date: null,
+                                depends_me: null,
+                                i_depend: null,
+                            },
+                        },
+                    ],
+                },
+            ],
         });
     } else if (node.key.startsWith('phase-')) {
         node.children.push({
@@ -475,16 +590,40 @@ function addChild(node: any) {
                 sprint_id: 1,
                 index: 0,
                 title: 'Ingrese el titulo del entregable',
-                days: 0,
+                days: 1,
                 percentage: 0,
                 percentage_planned: 0,
                 percentage_progress: 0,
                 start_date: suggestedStart,
                 end_date: suggestedStart,
+                restriction_end_date: null,
                 depends_me: null,
                 i_depend: null,
             },
-            children: [],
+            children: [
+                {
+                    key: `activity-`,
+                    data: {
+                        id: null,
+                        delivery_id: null,
+                        status_id: 1,
+                        substatus_id: null,
+                        priority_id: 1,
+                        user_id: null,
+                        index: node.children.length,
+                        title: 'Ingrese el titulo de la actividad',
+                        percentage: 0,
+                        percentage_planned: 0,
+                        percentage_progress: 0,
+                        days: 1,
+                        start_date: suggestedStart,
+                        end_date: suggestedStart,
+                        restriction_end_date: null,
+                        depends_me: null,
+                        i_depend: null,
+                    },
+                },
+            ],
         });
     } else if (node.key.startsWith('delivery-')) {
         node.children.push({
@@ -504,6 +643,7 @@ function addChild(node: any) {
                 days: 1,
                 start_date: suggestedStart,
                 end_date: suggestedStart,
+                restriction_end_date: null,
                 depends_me: null,
                 i_depend: null,
             },
@@ -519,8 +659,19 @@ function removeNode(node: any) {
             nodes.splice(index, 1);
             return true;
         }
+
         for (const n of nodes) {
-            if (n.children && recursiveRemove(n.children, key)) return true;
+            if (n.children && recursiveRemove(n.children, key)) {
+                // Si el hijo fue borrado, verificamos si ya no quedan hijos
+                if (n.children.length === 0 && !n.key.startsWith('project-')) {
+                    // Borrar el padre también si no es un proyecto
+                    const parentIndex = nodes.findIndex((p) => p.key === n.key);
+                    if (parentIndex !== -1) {
+                        nodes.splice(parentIndex, 1);
+                    }
+                }
+                return true;
+            }
         }
         return false;
     }
@@ -528,6 +679,7 @@ function removeNode(node: any) {
     recursiveRemove(treeData.value, node.key);
     onEdit();
 }
+
 function recalculateEdt(nodes: any[], prefix = '') {
     let lastedt = '';
     nodes.forEach((node, i) => {
@@ -546,7 +698,7 @@ function collectAllDepends(node: any, siblings: any[]): number[] {
     const stack: number[] = [];
 
     // Paso 1: buscar quienes dependen de mí directamente
-    siblings.forEach(sib => {
+    siblings.forEach((sib) => {
         if (sib.data.i_depend?.includes(node.data.id)) {
             stack.push(sib.data.id);
         }
@@ -558,9 +710,9 @@ function collectAllDepends(node: any, siblings: any[]): number[] {
         if (!visited.has(depId)) {
             visited.add(depId);
 
-            const depNode = siblings.find(sib => sib.data.id === depId);
+            const depNode = siblings.find((sib) => sib.data.id === depId);
             if (depNode) {
-                siblings.forEach(sib => {
+                siblings.forEach((sib) => {
                     if (sib.data.i_depend?.includes(depNode.data.id)) {
                         stack.push(sib.data.id);
                     }
@@ -571,19 +723,6 @@ function collectAllDepends(node: any, siblings: any[]): number[] {
 
     return Array.from(visited);
 }
-
-
-// function getSiblingOptions(node: any) {
-//     let siblings = findLevelTree(treeData.value, node);
-//     if (!siblings) return [];
-//     siblings = siblings.children;
-//     const meDepends: number[] = node.data.depends_me ?? [];
-//     return siblings.map((sib: any) => ({
-//         label: sib.data.index,
-//         key: sib.data.id,
-//         disabled: meDepends.includes(sib.data.id) || sib.key === node.key,
-//     }));
-// }
 
 function getSiblingOptions(node: any) {
     let siblingsContainer = findLevelTree(treeData.value, node);
@@ -616,7 +755,7 @@ function sortTreeByEndDate(nodes: any[]): any[] {
     if (!Array.isArray(nodes)) return nodes;
 
     return nodes
-        .map(node => {
+        .map((node) => {
             // Ordenamos recursivamente los hijos si existen
             if (node.children?.length) {
                 node.children = sortTreeByEndDate(node.children);
@@ -630,19 +769,6 @@ function sortTreeByEndDate(nodes: any[]): any[] {
         });
 }
 
-//ordenamiento global por dependencias
-// function globalSort() {
-//     function sort(tree: any) {
-//         for (const leaf of tree) {
-//             if (leaf.children) {
-//                 sort(leaf.children);
-//             } else {
-//                 tree.children = orderBasedInDepends(tree, leaf);
-//             }
-//         }
-//     }
-//     sort(treeData.value);
-// }
 //ordenamiento dependencias
 function orderBasedInDepends(nodes: any[], node: any): any[] {
     if (node.data.i_depend === null || (Array.isArray(node.data.i_depend) && node.data.i_depend.length === 0)) return nodes;
@@ -728,18 +854,45 @@ const renderLabel = ({ option }: any) => {
         sprints: sprints.value,
         users: users.value,
         'onUpdate:data': (newData: any) => {
-            Object.assign(option.data, newData);
-            onEdit();
+            const original = findOriginalNode(option); // PASAR option, NO option.data
+            if (original) {
+                Object.assign(original.data, newData);
+                onEdit();
+            }
         },
         'onAdd-child': () => {
-            addChild(option);
+            const original = findOriginalNode(option);
+            if (original) addChild(original);
             emit('submit');
         },
-        'onRemove-node': () => removeNode(option),
+        'onRemove-node': () => {
+            const original = findOriginalNode(option);
+            if (original) removeNode(original);
+        },
         'onDepends:data': (newData: any) => {
-            propagatesDepends(option, newData);
-            onEdit();
+            const original = findOriginalNode(option);
+            if (original) {
+                propagatesDepends(original, newData);
+                onEdit();
+            }
         },
     });
 };
+function findOriginalNode(filternode: any, nodes: any[] = treeData.value): any | undefined {
+    for (const node of nodes) {
+        if (node.key === filternode.key) {
+            return node;
+        }
+        if (node.children?.length) {
+            const found = findOriginalNode(filternode, node.children);
+            if (found) return found;
+        }
+    }
+    return undefined;
+}
 </script>
+<style scoped>
+.n-space {
+    width: max-content;
+}
+</style>

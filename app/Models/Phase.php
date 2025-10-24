@@ -30,6 +30,7 @@ class Phase extends Model
         'restriction_end_date',
         'depend_me',
         'i_depend',
+        'slack'
     ];
 
     // Relaciones

@@ -71,6 +71,7 @@ return new class extends Migration
             $table->date('real_end_date')->nullable();
             $table->date('restriction_start_date')->nullable();
             $table->date('restriction_end_date')->nullable();
+            $table->integer('slack')->default(0);
             $table->timestamps();
         });
         Schema::create('notes', function (Blueprint $table) {
@@ -100,6 +101,7 @@ return new class extends Migration
             $table->date('restriction_end_date')->nullable();
             $table->json('depend_me')->nullable();
             $table->json('i_depend')->nullable();
+            $table->integer('slack')->default(0);
             $table->timestamps();
         });
         Schema::create('deliveries', function (Blueprint $table) {
@@ -125,6 +127,7 @@ return new class extends Migration
             $table->date('restriction_end_date')->nullable();
             $table->json('depend_me')->nullable();
             $table->json('i_depend')->nullable();
+            $table->integer('slack')->default(0);
             $table->timestamps();
         });
 
@@ -149,6 +152,7 @@ return new class extends Migration
             $table->date('restriction_end_date')->nullable();
             $table->json('depend_me')->nullable();
             $table->json('i_depend')->nullable();
+            $table->integer('slack')->default(0);
             $table->timestamps();
         });
         Schema::create('stakeholders', function (Blueprint $table) {
@@ -187,6 +191,20 @@ return new class extends Migration
             $table->foreignId('requirement_id')->constrained('requirements')->onDelete('cascade');
             $table->timestamps();
         });
+        Schema::create('snap_projects',function(Blueprint $table){
+            $table->id();
+            $table->string('label')->nullable();
+            $table->foreignId('project_id')->constrained('projects')->onDelete('cascade');
+            $table->foreignId('user_id')->nullable()->constrained('users')->onDelete('cascade');
+            $table->decimal('percentage', 5, 2)->default(0);
+            $table->decimal('percentage_planned', 5, 2)->default(0);
+            $table->decimal('percentage_progress', 5, 2)->default(0);
+            $table->date('start_date')->nullable();
+            $table->date('end_date')->nullable();
+            $table->json('data')->nullable();
+            $table->timestamps();
+        });
+        
     }
 
     /**

@@ -17,6 +17,7 @@ export const useProjectStore = defineStore('project', () => {
     const users = ref<types.User[]>([])
     const sprints = ref<types.Sprint[]>([])
     const priorities = ref<types.Priority[]>([])
+    const agreement_types = ref<types.AgreementTypes[]>([])
     const hasChanges = computed(() => {
         return JSON.stringify(original.value) !== JSON.stringify(editable.value);
     });
@@ -31,6 +32,7 @@ export const useProjectStore = defineStore('project', () => {
         users.value = newProject.users ?? []
         sprints.value = newProject.sprints ?? []
         priorities.value = newProject.priorities ?? []
+        agreement_types.value = newProject.agreement_types??[]
     }
 
     function discardChanges() {
@@ -62,6 +64,7 @@ export const useProjectStore = defineStore('project', () => {
         statuses,
         substatuses,
         priorities,
+        agreement_types,
         customers,
         users,
         sprints,

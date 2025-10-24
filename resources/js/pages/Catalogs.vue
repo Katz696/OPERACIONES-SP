@@ -34,6 +34,11 @@ const breadcrumbs: BreadcrumbItem[] = [
     },
 ];
 onMounted(init)
+//permisos
+import { usePage } from '@inertiajs/vue3'
+
+const page = usePage()
+const auth = page.props.auth.user
 </script>
 
 <template>
@@ -53,7 +58,7 @@ onMounted(init)
                             </template>
                             Proyectos
                         </n-button>
-                        <n-button @click="activeTab = 'Usuarios'" :color="activeTab == 'Usuarios' ? '#ABABAB' : ''">
+                        <n-button v-if="auth?.permissions?.includes('users.view')" @click="activeTab = 'Usuarios'" :color="activeTab == 'Usuarios' ? '#ABABAB' : ''">
                             <template #icon>
                                 <n-icon>
                                     <PersonAddOutline />

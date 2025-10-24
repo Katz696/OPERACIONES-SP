@@ -28,12 +28,13 @@ export function mapProjectToGantt() {
             id: `phase-${phase.data.id}`,
             text: `FAS - ${phase.data.index} - ${phase.data.title}`,
             start_date: phase.data.start_date,
-            // end_date: phase.data.end_date,
+            slack:phase.data.slack,
             duration: phase.data.days,
             progress: phase.data.percentage / 100,
             planned: phase.data.percentage_planned ?? 0,
             type: assingType(phase.data.percentage, phase.data.percentage_planned),
             spi: spi(phase.data.percentage, phase.data.percentage_planned),
+            state:phase.data.status_id,
         });
     });
 

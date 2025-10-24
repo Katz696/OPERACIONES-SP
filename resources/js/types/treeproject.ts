@@ -18,11 +18,12 @@ export interface Activity {
         end_date: string
         real_end_date: string
         restriction_start_date: string
-        restriction_end_date: string
+        restriction_end_date: string | null
         activity_id: number | null
         depends_me: string[] | null
         i_depend: string[] | null
         comments: string | null
+        slack:number | null
     }
 }
 
@@ -46,10 +47,11 @@ export interface Delivery {
         end_date: string
         real_end_date: string
         restriction_start_date: string
-        restriction_end_date: string
+        restriction_end_date: string  | null
         depends_me: string[] | null
         i_depend: string[] | null
         comments: string | null
+        slack:number | null
     }
     activities: Activity[]
 }
@@ -70,10 +72,11 @@ export interface Phase {
         end_date: string
         real_end_date: string
         restriction_start_date: string
-        restriction_end_date: string
+        restriction_end_date: string  | null
         depends_me: string[] | null
         i_depend: string[] | null
         comments: string | null
+        slack:number | null
     }
     deliveries: Delivery[]
 }
@@ -94,8 +97,9 @@ export interface ProjectData {
         end_date: string
         real_end_date: string
         restriction_start_date: string
-        restriction_end_date: string
+        restriction_end_date: string  | null
         comments: string | null
+        slack:number | null
     }
     phases: Phase[]
 }
@@ -132,7 +136,10 @@ export interface User {
     id: number
     name: string
 }
-
+export interface AgreementTypes {
+    id:number
+    type:string
+}
 export interface FullProjectResponse {
     project: ProjectData
     customer: Customer
@@ -141,4 +148,5 @@ export interface FullProjectResponse {
     priorities: Priority[]
     users: User[]
     sprints: Sprint[]
+    agreement_types : AgreementTypes[]
 }

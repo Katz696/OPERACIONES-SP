@@ -46,6 +46,7 @@ export function useAltGanttMapper(): GanttMapperResult | null {
                     days: d.data.days,
                     start: d.data.start_date,
                     end: d.data.end_date,
+                    slack:d.data.slack,
                     percentage: d.data.percentage,
                     planned: d.data.percentage_planned,
                     isOverride: d.data.percentage < 100 && new Date(d.data.end_date) < today ? true : false,

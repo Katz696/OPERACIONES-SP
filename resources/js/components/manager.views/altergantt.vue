@@ -5,7 +5,7 @@
                 <n-space align="center" wrap>
                     <label for="">Fases:</label>
                     <n-select
-                        v-model:value="selectedPhase"
+                        v-model:value="filters.phase"
                         :options="[
                             { label: 'Todos', value: '' }, // ← opción para quitar filtro
                             ...phases.map((p) => ({ label: p.title.replace(/<[^>]*>/g, ''), value: p.id })),
@@ -15,9 +15,9 @@
                     />
                     <label for="">Estados:</label>
                     <n-select
-                        v-model:value="selectedStatus"
+                        v-model:value="filters.status"
+                        clearable
                         :options="[
-                            { label: 'Todos', value: '' },
                             { label: 'No iniciado', value: 1 },
                             { label: 'En progreso', value: 2 },
                             { label: 'Completado', value: 3 },
@@ -26,25 +26,13 @@
                         style="width: 200px"
                     />
                     <label for="">Vencimiento:</label>
-                    <n-select
-                        v-model:value="selectedOverride"
-                        :options="[
-                            { label: 'Todos', value: '' },
-                            { label: 'Vencido', value: true },
-                            { label: 'No vencido', value: false },
-                        ]"
-                        placeholder="Filtrar por Vencimiento"
-                        style="width: 200px"
-                    />
+                    <n-switch v-model:value="filters.overdueOnly">Solo vencidos</n-switch>
+                    <label for="">Ruta critica:</label>
+                    <n-switch v-model:value="filters.criticalPathOnly"></n-switch>
+                     <n-button @click="resetFilters" size="small" secondary>Limpiar</n-button>
                 </n-space>
             </n-space>
         </n-card>
-
-        <!-- escala (solo eje de fechas) -->
-        <!-- <div class="gantt-scale-wrapper">
-            <Bar ref="chartScaleRef" :data="scaledata" :options="scaleOptions" :style="{ height: scaleHeight + 'px', width: '100%' }" />
-        </div> -->
-
         <!-- gantt principal -->
         <div class="gantt-scroll-wrapper">
             <div class="gantt-chart-container">
@@ -60,7 +48,11 @@ import { BarController, BarElement, CategoryScale, Chart as ChartJS, Legend, Lin
 import 'chartjs-adapter-date-fns';
 import { computed, nextTick, onMounted, ref, watch } from 'vue';
 import { Bar } from 'vue-chartjs';
-// const scaledata = ref({ datasets: [], labels: [] });
+import {filtalter} from '@/composables/useFilters';
+const filters = filtalter;
+function resetFilters() {
+  filters.value = { phase: null, status: null, overdueOnly: false, criticalPathOnly:false }
+}
 // Registrar controlador + elementos
 ChartJS.register(BarController, BarElement, CategoryScale, LinearScale, TimeScale, Title, Tooltip, Legend);
 
@@ -86,28 +78,6 @@ const todayLine: Plugin = {
         ctx.restore();
     },
 };
-
-const statusIcons: Plugin = {
-    id: 'statusIcons',
-    afterDatasetsDraw(chart) {
-        const xScale = (chart as any).scales.x;
-        const yScale = (chart as any).scales.y;
-        if (!xScale || !yScale) return;
-        const ctx = chart.ctx;
-        ctx.save();
-        (chart.data.datasets || []).forEach((dataset: any) => {
-            (dataset.data || []).forEach((point: any) => {
-                const xStart = xScale.getPixelForValue(point.x[0]);
-                const xEnd = xScale.getPixelForValue(point.x[1]);
-                const y = yScale.getPixelForValue(point.y); // usamos índice/label según configuración más abajo
-                ctx.fillStyle = 'rgba(0, 123, 255, 0.4)';
-                ctx.fillRect(xStart, y - 10, xEnd - xStart, 20);
-            });
-        });
-        ctx.restore();
-    },
-};
-
 ChartJS.register(todayLine);
 
 // refs y heights
@@ -140,9 +110,6 @@ onMounted(async () => {
     chartsReady.value = true; // Marca que ya se pueden actualizar
 });
 
-const selectedPhase = ref(''); // id de fase seleccionada
-const selectedStatus = ref('');
-const selectedOverride = ref('');
 const phases = computed(() => {
     // extraer fases únicas de rawData
     const allPhases = rawData.value.map((d) => ({
@@ -153,32 +120,25 @@ const phases = computed(() => {
     // eliminar duplicados por id
     return Array.from(new Map(allPhases.map((p) => [p.id, p])).values());
 });
-// filtros (los tuyos)
-const selectedFase = ref('');
-const selectedTecnico = ref('');
-const searchText = ref('');
 
 // filteredData como antes
 const filteredData = computed(() =>
     rawData.value.filter((d) => {
-        const matchPhase = !selectedPhase.value || d.phase === selectedPhase.value;
-        const matchOverride =
-            selectedOverride.value === ''
-                ? true // "Todos"
-                : d.isOverride === selectedOverride.value;
-        const matchFase = !selectedFase.value || d.phase === selectedFase.value;
-        const matchTecnico = !selectedTecnico.value || d.tecnico === selectedTecnico.value;
-        const matchEstado = !selectedStatus.value || selectedStatus.value === 'Todos' || d.status === selectedStatus.value;
-        const matchSearch =
-            !searchText.value ||
-            d.title
-                .replace(/<[^>]*>/g, '')
-                .toLowerCase()
-                .includes(searchText.value.toLowerCase());
+        const matchOverride = filters.value.overdueOnly
+            ? d.isOverride === true     // solo vencidos
+            : true;                     // mostrar todos
 
-        return matchPhase && matchOverride && matchFase && matchTecnico && matchEstado && matchSearch;
-    }),
+        const matchCritical = filters.value.criticalPathOnly
+            ? d.slack === 0     // solo actividades en ruta crítica
+            : true;                     // mostrar todas
+
+        const matchFase = !filters.value.phase || d.phase === filters.value.phase;
+        const matchEstado = !filters.value.status || filters.value.status === null || d.status === filters.value.status;
+
+        return matchOverride && matchCritical && matchFase && matchEstado;
+    })
 );
+
 // 1) labels del eje Y en el orden que quieras mostrar
 const yLabels = computed(() => {
     // mantén orden: filtrados en orden original
@@ -277,9 +237,9 @@ const chartOptions = computed(
                                 `📅 Fin: ${item.end}`,
                                 `📅 Dias: ${item.days}`,
                                 `⚙️ Estado: ${estado}`,
-                                `   %Avance: ${item.percentage}`,
-                                `   %Planeado: ${item.planned}`,
-                                `   SPI: ${item.spi}`,
+                                `Avance Real: ${Math.round(item.percentage)}%`,
+                                `Avance Planeado: ${Math.round(item.planned)}%`,
+                                `SPI: ${Math.round(item.spi)}%`,
                             ];
                         },
                     },
@@ -293,30 +253,6 @@ const chartOptions = computed(
         }) as any,
 );
 
-// Opciones para el chart de escala (solo eje superior)
-// const scaleOptions = computed(() => ({
-//     maintainAspectRatio: false,
-//     responsive: true,
-//     indexAxis: 'y',
-//     layout: { padding: { right: 50 } },
-//     scales: {
-//         x: {
-//             type: 'time',
-//             position: 'top',
-//             time: { unit: 'month', displayFormats: { month: 'MMM yyyy' } },
-//             min: fit_start_date.value ? new Date(fit_start_date.value) : undefined,
-//             max: fit_end_date.value ? new Date(fit_end_date.value) : undefined,
-//             grid: { display: true, drawTicks: false },
-//             ticks: { color: '#333', font: { size: 12 } },
-//             afterFit: (axis: any) => {
-//                 axis.height = 30;
-//             },
-//         },
-//         y: { display: false },
-//     },
-//     plugins: { legend: { display: false }, tooltip: { enabled: false } },
-// }));
-
 // 4) cuando cambian datos o fechas, forzamos update en ambos charts para que reevalúen escalas y plugins
 watch(
     [chartData, chartOptions, /*scaleOptions,*/ yLabels],
@@ -326,12 +262,6 @@ watch(
 
         // const scaleChart = chartScaleRef.value?.chart;
         const mainChart = chartRef.value?.chart;
-
-        // if (scaleChart) {
-        //     scaleChart.options.scales.x.min = scaleOptions.value.scales.x.min;
-        //     scaleChart.options.scales.x.max = scaleOptions.value.scales.x.max;
-        //     scaleChart.update();
-        // }
 
         if (mainChart) {
             mainChart.options.scales.x.min = chartOptions.value.scales.x.min;

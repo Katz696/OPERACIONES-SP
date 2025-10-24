@@ -5,8 +5,11 @@ namespace App\Http\Controllers;
 use Illuminate\Support\Arr;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use App\Models\{Project, Phase, Delivery, Activity, Status, Substatus, Priority, Sprint, User};
+use App\Models\{Project, Phase, Delivery, Activity, Status, Substatus, Priority, Sprint, User,AgreementType};
+
+use Spatie\Activitylog\Models\Activity as Actlog;
 use Illuminate\Support\Facades\Log;
+
 class ProjectController extends Controller
 {
     /**
@@ -42,7 +45,7 @@ class ProjectController extends Controller
         $priorities = Priority::select('id', 'priority', 'color')->get();
         $sprints = Sprint::select('id', 'sprint')->get();
         $users = User::select('id', 'name')->get();
-
+        $agreetypes = AgreementType::select('id','type')->get();
         return response()->json([
             'project' => [
                 'data' => $project->only([
@@ -62,7 +65,8 @@ class ProjectController extends Controller
                     'end_date',
                     'real_end_date',
                     'restriction_start_date',
-                    'restriction_end_date'
+                    'restriction_end_date',
+                    'slack'
                 ]),
                 'phases' => $project->phases->map(function ($phase) {
                     return [
@@ -84,7 +88,8 @@ class ProjectController extends Controller
                             'restriction_start_date',
                             'restriction_end_date',
                             'depend_me',
-                            'i_depend'
+                            'i_depend',
+                            'slack'
                         ]),
                         'deliveries' => $phase->deliveries->map(function ($delivery) {
                             return [
@@ -111,7 +116,8 @@ class ProjectController extends Controller
                                     'restriction_start_date',
                                     'restriction_end_date',
                                     'depend_me',
-                                    'i_depend'
+                                    'i_depend',
+                                    'slack'
                                 ]),
                                 'activities' => $delivery->activities->map(function ($activity) {
                                     return [
@@ -135,7 +141,8 @@ class ProjectController extends Controller
                                             'restriction_start_date',
                                             'restriction_end_date',
                                             'depend_me',
-                                            'i_depend'
+                                            'i_depend',
+                                            'slack'
                                         ])
                                     ];
                                 })
@@ -150,6 +157,7 @@ class ProjectController extends Controller
             'priorities' => $priorities,
             'users' => $users,
             'sprints' => $sprints,
+            'agreement_types' => $agreetypes,
         ]);
     }
 
@@ -176,6 +184,7 @@ class ProjectController extends Controller
                     'real_end_date',
                     'restriction_start_date',
                     'restriction_end_date',
+                    'slack'
                 ]);
 
                 $project = Project::updateOrCreate(
@@ -205,7 +214,8 @@ class ProjectController extends Controller
                         'restriction_start_date',
                         'restriction_end_date',
                         'depend_me',
-                        'i_depend'
+                        'i_depend',
+                        'slack'
                     ]);
 
                     $phase = Phase::updateOrCreate(
@@ -241,7 +251,8 @@ class ProjectController extends Controller
                             'restriction_start_date',
                             'restriction_end_date',
                             'depend_me',
-                            'i_depend'
+                            'i_depend',
+                            'slack'
                         ]);
 
                         $delivery = Delivery::updateOrCreate(
@@ -278,7 +289,8 @@ class ProjectController extends Controller
                                 'restriction_end_date',
                                 'activity_id',
                                 'depend_me',
-                                'i_depend'
+                                'i_depend',
+                                'slack'
                             ]);
 
                             $activity = Activity::updateOrCreate(
@@ -314,5 +326,35 @@ class ProjectController extends Controller
                 'error'   => $e->getMessage(),
             ], 500);
         }
+    }
+
+    public function history(Request $request)
+    {
+        $projectId = $request->query('id');
+
+        $logs = Actlog::query()
+            ->where('log_name', 'projects')
+            ->where('subject_id', $projectId)
+            ->where('subject_type', \App\Models\Project::class)
+            ->with('causer') // para mostrar quién hizo el cambio
+            ->orderByDesc('created_at')
+            ->get()
+            ->map(function ($log) {
+                return [
+                    'id' => $log->id,
+                    'description' => $log->description,
+                    'causer' => $log->causer ? [
+                        'id' => $log->causer->id,
+                        'name' => $log->causer->name,
+                    ] : null,
+                    'changes' => [
+                        'old' => $log->properties['old'] ?? [],
+                        'new' => $log->properties['attributes'] ?? [],
+                    ],
+                    'created_at' => $log->created_at,
+                ];
+            });
+
+        return response()->json($logs);
     }
 }

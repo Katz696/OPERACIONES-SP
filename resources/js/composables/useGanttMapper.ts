@@ -26,6 +26,7 @@ export function mapProjectToGantt() {
     const start_date = editable.project.data.start_date;
     const end_date = editable.project.data.end_date;
     const duration = editable.project.data.days;
+    console.log(editable.project)
     // 🔹 Fases
     tasks.push({
         id: `project-${editable.project.data.id}`,
@@ -35,6 +36,7 @@ export function mapProjectToGantt() {
         state: editable.project.data.status_id,
         type: assingType(1, editable.project.data.percentage, editable.project.data.percentage_planned),
         spi: spi(editable.project.data.percentage, editable.project.data.percentage_planned),
+        slack:0,
         open: true,
     });
     editable.project.phases.forEach((phase) => {
@@ -51,6 +53,7 @@ export function mapProjectToGantt() {
             type: assingType(1, phase.data.percentage, phase.data.percentage_planned),
             spi: spi(phase.data.percentage, phase.data.percentage_planned),
             open: true,
+            slack:phase.data.slack,
         });
 
         // 🔹 Entregables
@@ -68,6 +71,7 @@ export function mapProjectToGantt() {
                 type: assingType(1, delivery.data.percentage, delivery.data.percentage_planned),
                 spi: spi(delivery.data.percentage, delivery.data.percentage_planned),
                 open: true,
+                slack:delivery.data.slack
             });
 
             // 🔹 Actividades
@@ -83,6 +87,7 @@ export function mapProjectToGantt() {
                     state: activity.data.status_id,
                     type: assingType(activity.data.days, activity.data.percentage, activity.data.percentage_planned),
                     spi: spi(activity.data.percentage, activity.data.percentage_planned),
+                    slack:activity.data.slack
                 });
                 // Dependencias (usa i_depend como arreglo)
                 if (activity.data.i_depend && activity.data.i_depend.length > 0) {

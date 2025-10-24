@@ -1,5 +1,5 @@
 <template>
-    <n-page-header subtitle="Gestión de Proyecto" class="mb-6 rounded-lg bg-white p-4 shadow">
+    <n-page-header subtitle="" class="mb-6 rounded-lg bg-white p-4 shadow">
         <template #title>
             <div class="flex items-center gap-2">📁 {{ project?.data?.title.replace(/<[^>]*>/g, '') || 'Proyecto sin nombre' }}</div>
         </template>
